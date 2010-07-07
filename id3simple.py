@@ -1,8 +1,82 @@
 #!/usr/bin/python
 
+from __future__ import print_function
+
 import re
 from id3man import *
 from myspath import path
+
+mainbasedir = path('/home/wendell/Music/gpodder/')
+mainfinaldir = path('/home/wendell/Music/podcast')
+
+class Directory(object):
+    members = []
+    
+    def __init__(self, title, basedir=None, finaldir=None, fix=None):
+        title = self.title = title or unicode(basedir[-1])
+        self.basedir = basedir or mainbasedir + filesanitize(title)
+        self.finaldir = finaldir or mainfinaldir + unicode(filesanitize(title))
+        self.album = title
+        self.artist = title
+        self.genre = 'Podcast'
+        self.experimental = False
+        if fix:
+            self.fix = fix
+        self.members.append(self)
+    
+    def run(self, makechanges=True, ignoreerr=True, printout=True):
+        print('-'*72)
+        if self.experimental:
+            makechanges = False
+        if printout:
+            print('***', unicode(self.title) + '...')
+        copycover(self.basedir, self.finaldir)
+        for f in id3walk(self.basedir, makechanges, ignoreerr, printout):
+            print("Calling:", repr(f), repr(printout))
+            self.fix(f, printout)
+    
+    def runold(self, makechanges = False, ignoreerr=True, printout=True):
+        basedir = self.basedir
+        self.basedir = self.finaldir
+        self.run(makechanges, ignoreerr, printout)
+        self.basedir = basedir
+    
+    @classmethod
+    def runall(cls, makechanges=True, ignoreerr=True, printout=True):
+        for member in cls.members:
+            member.run(makechanges, ignoreerr, printout)
+    
+    def newfix(self, func):
+        self.fix = lambda *a, **kw: func(self, *a, **kw)
+    
+    def fix(self, f, printout=True):
+        self.defaultfix(f, printout)
+    
+    def defaultfix(self, f, printout = True):
+        printout and print(f.filename)
+        printout and print("Title:   ", f['title'])
+        if self.artist and f['artist'] != self.artist:
+            f['artist'] = self.artist
+            printout and print('Artist:  ', f['artist'])
+        if self.album and f['album'] != self.album:
+            f['album'] = self.album
+            printout and print('Album:  ', f['album'])
+        f['genre'] = self.genre
+        f.filename = self.finaldir + f.filename[-1]
+
+class Librivox(Directory):
+    def __init__(self, basedir, finaldir=None, title=None, fix=None):
+        Directory.__init__(self, basedir, finaldir, title, fix)
+        self.genre = 'Audiobook'
+    
+    def defaultfix(self, f, printout=True):
+        Directory.defaultfix(self, f, printout)
+        if str(f['artist']) != 'Librivox':
+            if printout:
+                print("artist:", str(f['artist']))
+            f['TOPE'] = str(f['artist'])
+            f['artist'] = 'Librivox'
+
 
 
 def titlefitter(strng):
@@ -32,162 +106,62 @@ def copycover(dir1, dir2):
     if cvr.isfile() and not fnlcvr.isfile():
         cvr.copy(dir2, True)
 
-def scifi(n):
-    alb = 'Sci-Fi Shorts ' + str(n)
-    libr('/data/audio/audiobook/scifi_collection_'+str(n), alb)
+inourtime = Directory('In Our Time')
+inourtime.basedir = mainbasedir + "In Our Time With Melvyn Bragg"
+inourtime.finaldir = mainfinaldir + "Melvyn_Bragg/In_Our_Time"
+inourtime.artist = 'Melvyn Bragg'
+inourtime.album = 'In Our Time'
+inourtime.experimental = True
 
-def myst(n):
-    alb = 'Mystery Shorts ' + str(n)
-    libr('/data/audio/audiobook/mystery_collection_'+str(n), alb)
-    
-def sherholm(makechanges = False):
-    dr = '/data/audio/audiobook'
-    
-    
-    for f in id3walk(dr, makechanges, True):
-        if 'Sherlock' not in f.dir:
-            continue
-        print('-'*40)
-        #print(f.pprint())
-        #print(f.filename)
-        print(f['title'])
-        if f['artist'] != 'Sir Arthur Conan Doyle':
-            f['tope'] = f['artist']
-            f['artist'] = 'Sir Arthur Conan Doyle'
-        startstr = 'The Adventure Of '.lower()
-        if f['title'][:len(startstr)].lower() == startstr:
-            f['title'] = f['title'][len(startstr):].strip()
-        
-        #m = re.match(r'(\d*) *- *(\d*) *(.*)',f['title'])
-        #
-        #if len(splits) > 3 or len(splits) < 2:
-            #raise KeyError, "Expected title of form '# - TITLE' or '#-# - title'"
-        #title = splits[-1]
-        #num = splits[-2]
-        #if len(splits) == 3:
-            #f['TPOS'] = splits[0]
-        try:
-            f['title'], f['tracknum'], disc = titlefitter(f['title'])
-            if disc:
-                f['TPOS'] = disc
-        except TypeError:
-            pass
-        f['genre'] = 'Audiobook'
-        lastf = f
-    
-    
-    
-def libshorts(makechanges = False):
-    dr='/home/wendell/Music/gpodder/Classic Short Stories from LibriVox [Unabridged] (2)'
-    finaldir = '/home/wendell/Music/audiobook/Classic_Short_Stories'
-    alb = 'Best Short Stories' 
-    libr(dr,finaldir,alb,makechanges)
+bob = Directory('History According to Bob')
+bob.basedir = mainbasedir + "History According to Bob (2)"
+bob.finaldir = mainfinaldir + "Bob/History_According_to_Bob"
+bob.genre = 'Podcast'
+bob.album = 'History According to Bob'
+bob.artist = 'Bob'
+bob.experimental = True
 
-lastf = None
+thinking = Directory('Thinking Allowed',
+                path("/home/wendell/Music/gpodder/Thinking Allowed"),
+                path("/home/wendell/Music/podcast/Thinking_Allowed"))
+thinking.artist = 'BBC'
+thinking.album = 'Thinking Allowed'
 
-def libr(dr, finaldir, alb, makechanges = True, ignoreerr = True):
-    for f in id3walk(dr, makechanges, ignoreerr):
-        print('-'*40)
-        #print(f.pprint())
-        #print(f.filename)
-        print(f['title'])
-        if str(f['artist']) != 'Librivox':
-            print "artist:", str(f['artist'])
-            f['TOPE'] = str(f['artist'])
-            f['artist'] = 'Librivox'
-        f['genre'] = 'Audiobook'
-        f['album'] = alb
-        f.filename = path(finaldir) + path(f.filename)[-1]
-    #print dir(lastf)
+thor = Directory('The History of Rome',
+    path("/data/mp3/gpodder/The History of Rome/"),
+    path("/home/wendell/Music/podcast/Mike_Duncan/The_History_Of_Rome"))
+thor.artist = 'Mike Duncan'
+thor.album = 'Rome'
+thor.genre = 'Podcast'
+@thor.newfix
+def fix(self, f, printout=True):
+    print(repr(self), repr(f), repr(printout))
+    t = f['Title']
+    t = t.replace(': ','-')
+    t = t.replace('- ','-')
+    t = t.replace(' -','-')
+    if t[:4] == 'Thor':
+        t = 'THOR' + t[4:]
+    if (t[:5]).upper() == 'THOR ':
+        t = t[5:]
+    #else: print(t[:5])
+    title, num,disc = titlefitter(t)
+    if int(num) == 666 or int(num) == 66:
+        num = '66'
+        if '666' not in title:
+            title = '666: ' + title
+    printout and print("num,disc:", repr((num,disc)))
+    f['title'] = "%02d-%s" % (int(num), title)
+    if title[1] == '-':
+        f['title'] = "%02d%s" % (int(num), title)
+    f['track'] = str(num)
+    #print title, num, disc
+    newf = filesanitize(str(f['title'])) + '.mp3'
+    printout and print("new title:", f['title'])
+    f.filename = self.finaldir + newf
+    printout and print("new filename:", f.filename)
         
 
-def slowg():
-    dir = '/data/audio/gpodder/d7bd50135ba90812eb08a217197bf91d'
-    for f in id3walk(dir, True):
-        print('-'*40)
-        print(f['title'])
-        f['title'] = f['title'].replace('Slow German #','')
-        f['title'] = f['title'].replace(': ','-')
-        f['title'] = f['title'].replace(':','-')
-        if f['title'][2] == '-':
-            f['title'] = '0'+f['title']
-        try:
-            tr=int(f['title'][:3])
-            f['trck']=str(tr)
-        except ValueError:
-            pass
-
-def inourtime(fullrun=True):
-    #dir = '/data/mp3/podcast/Mike Duncan/The History Of Rome'
-    dir = path("/home/wendell/Music/gpodder/In Our Time With Melvyn Bragg")
-    finaldir = path("/home/wendell/Music/podcast/Melvyn_Bragg/In_Our_Time")
-    copycover(dir, finaldir)
-    for f in id3walk(dir, fullrun):
-        print('-'*40)
-        print(f['title'])
-        print(f.filename)
-        t = f['title']
-        f['artist'] = 'Melvyn Bragg'
-        f['album'] = 'In Our Time'
-        f['genre'] = 'Podcast'
-        #print title, num, disc
-        f.filename = finaldir +f.filename[-1]
-        print "new filename:", f.filename
-
-def thinking(fullrun=True):
-    #dir = '/data/mp3/podcast/Mike Duncan/The History Of Rome'
-    dir = path("/home/wendell/Music/gpodder/Thinking Allowed")
-    finaldir = path("/home/wendell/Music/podcast/Thinking_Allowed")
-    copycover(dir, finaldir)
-    for f in id3walk(dir, fullrun):
-        print('-'*40)
-        print(f['title'])
-        print(f.filename)
-        t = f['title']
-        f['artist'] = 'BBC'
-        f['album'] = 'Thinking Allowed'
-        f['genre'] = 'Podcast'
-        #print title, num, disc
-        f.filename = finaldir +f.filename[-1]
-        print "new filename:", f.filename
-
-def thor(fullrun=True):
-    #dir = '/data/mp3/podcast/Mike Duncan/The History Of Rome'
-    dir = path("/data/mp3/gpodder/The History of Rome/")
-    finaldir = path("/home/wendell/Music/podcast/Mike_Duncan/The_History_Of_Rome")
-    copycover(dir, finaldir)
-    for f in id3walk(dir, fullrun):
-        print('-'*40)
-        print(f['title'])
-        print(f.filename)
-        t = f['title']
-        f['artist'] = 'Mike Duncan'
-        f['album'] = 'Rome'
-        f['genre'] = 'Podcast'
-        t = t.replace(': ','-')
-        t = t.replace('- ','-')
-        t = t.replace(' -','-')
-        if t[:4] == 'Thor':
-            t = 'THOR' + t[4:]
-        if (t[:5]).upper() == 'THOR ':
-            t = t[5:]
-        #else: print(t[:5])
-        title, num,disc = titlefitter(t)
-        if int(num) == 666 or int(num) == 66:
-            num = '66'
-            if '666' not in title:
-                title = '666: ' + title
-        print "num,disc:", repr((num,disc))
-        f['title'] = "%02d-%s" % (int(num), title)
-        if title[1] == '-':
-            f['title'] = "%02d%s" % (int(num), title)
-        f['track'] = str(num)
-        #print title, num, disc
-        newf = filesanitize(str(f['title'])) + '.mp3'
-        print "new title:", f['title']
-        f.filename = finaldir + newf
-        print "new filename:", f.filename
-        
 def bob(fullrun=False):
     #dir = '/data/mp3/podcast/Mike Duncan/The History Of Rome'
     dir = path("/data/mp3/gpodder/History According to Bob (2)")
@@ -204,9 +178,9 @@ def bob(fullrun=False):
         f['album'] = 'History According to Bob'
         #else: print(t[:5])
         #title, num,disc = titlefitter(t)
-        print "new title:", f['title']
+        print("new title:", f['title'])
         f.filename = finaldir + f.filename[-1]
-        print "new filename:", f.filename
+        print("new filename:", f.filename)
 
 def norman(fullrun=False):
     #dir = '/data/mp3/podcast/Mike Duncan/The History Of Rome'
@@ -224,9 +198,9 @@ def norman(fullrun=False):
         f['album'] = 'Norman Centuries'
         #else: print(t[:5])
         #title, num,disc = titlefitter(t)
-        print "new title:", f['title']
+        print("new title:", f['title'])
         f.filename = finaldir + f.filename[-1]
-        print "new filename:", f.filename
+        print("new filename:", f.filename)
 
 
 def byzantine(fullrun=False):
@@ -244,9 +218,9 @@ def byzantine(fullrun=False):
         f['album'] = '12 Byzantine Rulers'
         #else: print(t[:5])
         #title, num,disc = titlefitter(t)
-        print "new title:", f['title']
+        print("new title:", f['title'])
         f.filename = finaldir + f.filename[-1]
-        print "new filename:", f.filename
+        print("new filename:", f.filename)
         
 def fooc(makechanges = False):
     finaldir = path("/data/mp3/podcast/From_Our_Own_Correspondent")
@@ -254,9 +228,9 @@ def fooc(makechanges = False):
     if makechanges:
         copycover(dir, finaldir)
     for f in id3walk(dir, makechanges):
-        print "-"*70
-        print f.filename
-        print f['title']
+        print("-"*70)
+        print(f.filename)
+        print(f['title'])
         #t = f['title']
         #t = subremove(t, "FOOC:").strip()
         #t = subremove(t, "BBC Radio 4").strip()
@@ -270,10 +244,10 @@ def fooc(makechanges = False):
             yr = yr [-2:] # drop the '20' part of the year
             f['title'] = "FOOC {0}-{1}-{2}".format(yr, mnth, day)
             f.filename = finaldir + f.filename[-1]
-            print f['title']
-            print f.filename
+            print(f['title'])
+            print(f.filename)
         else:
-            print "MATCH FAILED!!"
+            print("MATCH FAILED!!")
 
 def dancarlin(makechanges = False):
     finaldir = path(r"/data/mp3/podcast/Dan_Carlin")
@@ -281,10 +255,10 @@ def dancarlin(makechanges = False):
     if makechanges:
         copycover(dir, finaldir)
     for f in id3walk(dir, makechanges):
-        print "-"*70
-        print f.filename
+        print("-"*70)
+        print(f.filename)
         try:
-            print f['title'], f['album']
+            print(f['title'], f['album'])
         except Exception:
             pass
         f['album'] = 'Hardcore History'
@@ -297,9 +271,9 @@ def pri(makechanges = False):
     if makechanges:
         copycover(dir, finaldir)
     for f in id3walk(dir, makechanges):
-        print "-"*70
-        print f.filename
-        print f['title'], f['album']
+        print("-"*70)
+        print(f.filename)
+        print(f['title'], f['album'])
         f['album'] = 'To the Best of Our Knowledge'
         f['artist'] = 'PRI'
         f.filename = finaldir + f.filename[-1]
@@ -310,9 +284,9 @@ def radiolab(makechanges = False):
     if makechanges:
         copycover(dir, finaldir)
     for f in id3walk(dir, makechanges):
-        print "-"*70
-        print f.filename
-        print f['title'], f['album']
+        print("-"*70)
+        print(f.filename)
+        print(f['title'], f['album'])
         f['album'] = 'Radiolab'
         f['artist'] = 'Radiolab'
         f.filename = finaldir + f.filename[-1]
@@ -323,9 +297,9 @@ def npr(makechanges = False):
     if makechanges:
         copycover(dir, finaldir)
     for f in id3walk(dir, makechanges):
-        print "-"*70
-        print f.filename
-        print f['title'], f['album']
+        print("-"*70)
+        print(f.filename)
+        print(f['title'], f['album'])
         f['album'] = 'Science Friday'
         f['artist'] = 'NPR'
         f.filename = finaldir + f.filename[-1]
@@ -354,7 +328,7 @@ def kermode(fullrun=False):
         #else: print(t[:5])
         #title, num,disc = titlefitter(t)
         f.filename = finaldir + f.filename[-1]
-        print "new filename:", f.filename
+        print("new filename:", f.filename)
         
 
 def nature(fullrun=False):
@@ -373,36 +347,40 @@ def nature(fullrun=False):
         #else: print(t[:5])
         #title, num,disc = titlefitter(t)
         f.filename = finaldir + f.filename[-1]
-        print "new filename:", f.filename
+        print("new filename:", f.filename)
 
 if __name__ == "__main__": #and False:
+    Directory.runall()
+    
+    
+    exit()
     div = '='*30 + '\n'
-    print div, "History of Rome..."
+    print(div, "History of Rome...")
     thor(True)
-    print div, "FOOC..."
+    print(div, "FOOC...")
     fooc(True)
-    print div, "Dan Carlin..."
+    print(div, "Dan Carlin...")
     dancarlin(True)
-    print div, "PRI..."
+    print(div, "PRI...")
     pri(True)
-    print div, "NPR..."
+    print(div, "NPR...")
     npr(True)
-    print div, "Radio Lab..."
+    print(div, "Radio Lab...")
     radiolab(True)
-    print div, "Bob..."
+    print(div, "Bob...")
     bob(True)
-    print div, "Norman Centuries..."
+    print(div, "Norman Centuries...")
     norman(True)
-    print div, "12 Byzantine Rulers..."
+    print(div, "12 Byzantine Rulers...")
     byzantine(True)
-    print div, "Shorts..."
+    print(div, "Shorts...")
     libshorts(True)
-    print div, "In Our Time..."
+    print(div, "In Our Time...")
     inourtime(True)
-    print div, "Thinking Allowed..."
+    print(div, "Thinking Allowed...")
     thinking(True)
-    print div, "Kermode..."
+    print(div, "Kermode...")
     kermode(True)
-    print div, "Nature..."
+    print(div, "Nature...")
     nature(True)
     

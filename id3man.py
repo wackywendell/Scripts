@@ -85,7 +85,7 @@ class id3manager(Mapping):
     def pprint(self):
         return "Filename=" + str(self._id3.filename)  + '\n' + self._id3.pprint()
 
-def id3walk(dir = path.cwd(), makechanges = False, ignoreerr = True):
+def id3walk(dir = path.cwd(), makechanges = False, ignoreerr = True, printout = True):
     """Walks through a directory, yielding all files that can be read as ID3 files.
     
     makechanges: id3walk will save afterwards if true
@@ -117,10 +117,11 @@ def id3walk(dir = path.cwd(), makechanges = False, ignoreerr = True):
             changed.append("Filename")
         for k in eid3.changedkeys:
             changed.append(k)
-        if changed:
+        if changed and printout:
             print "Changed " + ",".join(changed)
         if makechanges and changed:
-            print "Saving..."
+            if printout:
+                print "Saving..."
             eid3.save()
     
     origwd.chdir()
