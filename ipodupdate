@@ -21,3 +21,7 @@ fi
 command="rsync -vrlt --modify-window=3 --delete-excluded --exclude-from "$excludefile" /data/mp3/ /media/NIGEL/audio"
 echo $command
 $command
+
+echo "EJECTING..."
+sudo eject /media/NIGEL
+echo "Done!"

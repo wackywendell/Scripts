@@ -134,6 +134,7 @@ def filesanitize(s):
     s = s.replace('\n', ' ')
     s = s.replace(',', '')
     s = s.replace('!', '')
+    s = s.replace('?', '')
     return cls(s)
 
 #id3fn=path("~/scripts/test/rlab604.mp3").expanduser()

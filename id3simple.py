@@ -25,14 +25,13 @@ class Directory(object):
         self.members.append(self)
     
     def run(self, makechanges=True, ignoreerr=True, printout=True):
-        print('-'*72)
+        print('='*72)
         if self.experimental:
             makechanges = False
         if printout:
             print('***', unicode(self.title) + '...')
         copycover(self.basedir, self.finaldir)
         for f in id3walk(self.basedir, makechanges, ignoreerr, printout):
-            print("Calling:", repr(f), repr(printout))
             self.fix(f, printout)
     
     def runold(self, makechanges = False, ignoreerr=True, printout=True):
@@ -53,6 +52,7 @@ class Directory(object):
         self.defaultfix(f, printout)
     
     def defaultfix(self, f, printout = True):
+        printout and print('-'*72)
         printout and print(f.filename)
         printout and print("Title:   ", f['title'])
         if self.artist and f['artist'] != self.artist:
@@ -111,7 +111,6 @@ inourtime.basedir = mainbasedir + "In Our Time With Melvyn Bragg"
 inourtime.finaldir = mainfinaldir + "Melvyn_Bragg/In_Our_Time"
 inourtime.artist = 'Melvyn Bragg'
 inourtime.album = 'In Our Time'
-inourtime.experimental = True
 
 bob = Directory('History According to Bob')
 bob.basedir = mainbasedir + "History According to Bob (2)"
@@ -119,7 +118,6 @@ bob.finaldir = mainfinaldir + "Bob/History_According_to_Bob"
 bob.genre = 'Podcast'
 bob.album = 'History According to Bob'
 bob.artist = 'Bob'
-bob.experimental = True
 
 thinking = Directory('Thinking Allowed',
                 path("/home/wendell/Music/gpodder/Thinking Allowed"),
@@ -135,8 +133,9 @@ thor.album = 'Rome'
 thor.genre = 'Podcast'
 @thor.newfix
 def fix(self, f, printout=True):
-    print(repr(self), repr(f), repr(printout))
-    t = f['Title']
+    self.defaultfix(f, printout)
+    t = f['title']
+    t = t.replace('-The History of Rome', '')
     t = t.replace(': ','-')
     t = t.replace('- ','-')
     t = t.replace(' -','-')
@@ -161,81 +160,24 @@ def fix(self, f, printout=True):
     f.filename = self.finaldir + newf
     printout and print("new filename:", f.filename)
         
+norman= Directory('Norman Centuries',
+    path("/home/wendell/Music/gpodder/Norman Centuries | A Norman History Podcast by Lars Brownworth (2)"),
+    path("/home/wendell/Music/podcast/Lars_Brownworth/Norman_Centuries"))
+norman.artist = 'Lars Brownworth'
+norman.album = 'Norman Centuries'
 
-def bob(fullrun=False):
-    #dir = '/data/mp3/podcast/Mike Duncan/The History Of Rome'
-    dir = path("/data/mp3/gpodder/History According to Bob (2)")
-    finaldir = path("/home/wendell/Music/podcast/Bob/History_According_to_Bob")
-    copycover(dir, finaldir)
-    for f in id3walk(dir, fullrun):
-        print('-'*40)
-        print(f['title'])
-        print(f.filename)
-        f['genre'] = 'Podcast'
-        
-        t = f['title']
-        f['artist'] = 'Bob'
-        f['album'] = 'History According to Bob'
-        #else: print(t[:5])
-        #title, num,disc = titlefitter(t)
-        print("new title:", f['title'])
-        f.filename = finaldir + f.filename[-1]
-        print("new filename:", f.filename)
-
-def norman(fullrun=False):
-    #dir = '/data/mp3/podcast/Mike Duncan/The History Of Rome'
-    dir = path("/home/wendell/Music/gpodder/Norman Centuries | A Norman History Podcast by Lars Brownworth (2)")
-    finaldir = path("/home/wendell/Music/podcast/Lars_Brownworth/Norman_Centuries")
-    copycover(dir, finaldir)
-    for f in id3walk(dir, fullrun):
-        print('-'*40)
-        print(f['title'])
-        print(f.filename)
-        f['genre'] = 'Podcast'
-        
-        t = f['title']
-        f['artist'] = 'Lars Brownworth'
-        f['album'] = 'Norman Centuries'
-        #else: print(t[:5])
-        #title, num,disc = titlefitter(t)
-        print("new title:", f['title'])
-        f.filename = finaldir + f.filename[-1]
-        print("new filename:", f.filename)
+byzantine = Directory('12 Byzantine Rulers',
+    path("/home/wendell/Music/gpodder/12 Byzantine Rulers_ The History of The Byzantine Empire"),
+    path("/home/wendell/Music/podcast/Lars_Brownworth/Byzantine_Rulers"))
+byzantine.artist = 'Lars Brownworth'
 
 
-def byzantine(fullrun=False):
-    dir = path("/home/wendell/Music/gpodder/12 Byzantine Rulers_ The History of The Byzantine Empire")
-    finaldir = path("/home/wendell/Music/podcast/Lars_Brownworth/Byzantine_Rulers")
-    copycover(dir, finaldir)
-    for f in id3walk(dir, fullrun):
-        print('-'*40)
-        print(f['title'])
-        print(f.filename)
-        f['genre'] = 'Podcast'
-        
-        t = f['title']
-        f['artist'] = 'Lars Brownworth'
-        f['album'] = '12 Byzantine Rulers'
-        #else: print(t[:5])
-        #title, num,disc = titlefitter(t)
-        print("new title:", f['title'])
-        f.filename = finaldir + f.filename[-1]
-        print("new filename:", f.filename)
-        
-def fooc(makechanges = False):
-    finaldir = path("/data/mp3/podcast/From_Our_Own_Correspondent")
-    dir = path("/data/mp3/gpodder/From Our Own Correspondent")
-    if makechanges:
-        copycover(dir, finaldir)
-    for f in id3walk(dir, makechanges):
-        print("-"*70)
-        print(f.filename)
-        print(f['title'])
-        #t = f['title']
-        #t = subremove(t, "FOOC:").strip()
-        #t = subremove(t, "BBC Radio 4").strip()
-        #t = subremove(t, ",").strip()
-        #print t
+fooc=Directory('From Our Own Correspondent',
+    path("/data/mp3/gpodder/From Our Own Correspondent"),
+    path("/data/mp3/podcast/From_Our_Own_Correspondent"))
+fooc.artist = 'BBC'
+fooc.experimental = True
+if False:
         match = re.match(r"fooc_(\d{4})(\d{2})(\d{2})-\d+.*\.mp3", f.filename[-1])
         f['album'] = 'From Our Own Correspondent'
         f['artist'] = 'BBC Radio'
