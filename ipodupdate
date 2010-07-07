@@ -1,0 +1,23 @@
+#!/bin/bash
+
+excludefile=/home/wendell/scripts/ipodexclude.txt
+
+command="python /home/wendell/scripts/id3simple.py"
+echo $command
+$command
+echo "------------------------------------------------"
+
+if [[ ! -d /media/NIGEL/.rockbox ]] ; then
+    echo "MOUNTING..."
+    sudo mount -t vfat '/dev/disk/by-id/usb-Apple_iPod_00000098DCFB-0:0-part2' /media/NIGEL -o'uid=1001,gid=1001,shortname=mixed'
+    echo "------------------------------------------------"
+fi
+
+if [[ ! -d /media/NIGEL/.rockbox ]] ; then
+    echo "Device still does not exist. Is the ipod plugged in?"
+    exit 2
+fi
+
+command="rsync -vrlt --modify-window=3 --delete-excluded --exclude-from "$excludefile" /data/mp3/ /media/NIGEL/audio"
+echo $command
+$command

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# place to look for cities:
+# http://xoap.weather.com/search/search?where=NORWICH
+
+# city codes (remove dash; dash is there so it won't be matched on find/replace):
+#~ loc=USMA0046 # Boston
+loc=USNH0102 # Hanover
+#~ loc=USMA0230 # Manchester
+#~ loc=USNM0004 # Albuquerque
+
+#~ echo $@
+conkyForecast -il$loc $@

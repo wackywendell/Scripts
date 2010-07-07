@@ -1,0 +1,165 @@
+#!/usr/bin/python3
+
+import sys, os, tempfile, fcntl
+from subprocess import Popen, PIPE
+from contextlib import closing
+
+def printerr(*args, file=sys.stderr, **kwargs):
+    print(*args, **kwargs)
+
+class SingleInstance:
+    def __init__(self, name):
+        self.lockfile = os.path.normpath(tempfile.gettempdir() + os.path.sep + name + '.lock')
+        self.fp = open(self.lockfile, 'w')
+        try:
+            fcntl.lockf(self.fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.valid = True
+        except IOError:
+            printerr("Another instance is already running, quitting.")
+            self.valid = False
+            return
+
+def raisewin(pid):
+    wmproc = Popen("wmctrl -lp", shell=True,stdout=PIPE)
+    wmoutb = wmproc.communicate()[0]
+    wmout = wmoutb.decode()
+    #print(type(wmout), "wmout:",wmout)
+    wmoutlines = wmout.split('\n')
+    #print(type(wmoutlines), "wmoutlines:",wmoutlines)
+    for l in wmoutlines:
+        fields = [f for f in l.split(" ") if f]
+        #print(fields)
+        if len(fields) < 3:
+            continue
+        print(fields[2],pid)
+        if int(fields[2]) == int(pid):
+            print("RUNNING, raising...", pid, fields[0])
+            wmp = Popen("wmctrl -ia "+fields[0], shell=True)
+            wmp.wait()
+
+me = SingleInstance(sys.argv[1])
+p = Popen(sys.argv[1:])
+printerr('waiting..')
+p.wait()
+printerr('finished.')
+exit()
+# NOTHING BELOW SHOULD EXECUTE
+
+import os, os.path, shelve
+from sys import argv
+from subprocess import Popen, PIPE
+from contextlib import closing
+
+shelfname = os.path.expanduser('/tmp/runonceshelf')
+
+#with closing(shelve.open(shelfname)) as shelf:
+    #del shelf[argv[1]]
+
+shelfarg = " ".join(argv[1:])
+
+def runprog():
+    p = Popen(argv[1:])
+    curpid = p.pid
+    with closing(shelve.open(shelfname)) as shelf:
+        shelf[shelfarg] = curpid
+        shelf.sync()
+        #print(list(shelf.keys()))
+    print('waiting..')
+    p.wait()
+    print('finished.')
+    with closing(shelve.open(shelfname)) as shelf:
+        if shelfarg in shelf:
+            del shelf[shelfarg]
+    exit()
+
+def raisewin(pid):
+    wmproc = Popen("wmctrl -lp", shell=True,stdout=PIPE)
+    wmoutb = wmproc.communicate()[0]
+    wmout = wmoutb.decode()
+    #print(type(wmout), "wmout:",wmout)
+    wmoutlines = wmout.split('\n')
+    #print(type(wmoutlines), "wmoutlines:",wmoutlines)
+    for l in wmoutlines:
+        fields = [f for f in l.split(" ") if f]
+        #print(fields)
+        if len(fields) < 3:
+            continue
+        print(fields[2],pid)
+        if int(fields[2]) == int(pid):
+            print("RUNNING, raising...", pid, fields[0])
+            wmp = Popen("wmctrl -ia "+fields[0], shell=True)
+            wmp.wait()
+
+#ps = []
+#for p in os.listdir('/proc'):
+    #try:
+        #int(p)
+        #ps.append(p)
+    #except ValueError:
+        #pass
+#
+#d={}
+
+pid=None
+with closing(shelve.open(shelfname)) as shelf:
+    if shelfarg in shelf:
+        pid = shelf[shelfarg]
+
+if pid:
+    print("PID in shelf", pid)
+    # check that pid is still running
+    ps = Popen('ps -e', shell=True, stdout=PIPE)
+    psoutb = ps.communicate()[0]
+    psout = psoutb.decode()
+    #print("Processes:")
+    #print(psout)
+    for l in psout.split('\n'):
+        fields = [f for f in l.split(' ') if f]
+        #print("fields:",fields)
+        try:
+            newpid = int(fields[0])
+        except (ValueError, IndexError):
+            #print("error", fields)
+            continue
+        #print(type(newpid), type(pid))
+        #print(newpid, pid)
+        # raise that window
+        if newpid==pid:
+            print("found window!",pid)
+            raisewin(pid)
+            exit()
+    print("in shelf, but not found, running...")
+    runprog()
+else:
+    with closing(shelve.open(shelfname)) as shelf:
+        print(shelfarg, list(shelf.keys()))
+        print("shelfarg not in shelf")
+    runprog()
+
+
+#for p in ps:
+    #fpth = os.path.join('/proc',p,'cmdline')
+    #with open(fpth) as f:
+        #cmd = f.read()
+        #cmds = cmd.split('\x00')[:-1]
+    #d[p] = cmds
+#
+#for k in d:
+    #if not d[k]:
+        #continue
+    #exc = os.path.basename(d[k][0])
+    #args = d[k][1:]
+    #if 'python' in exc:
+        #if args:
+            #exc = args[0]
+            #args = args[1:]
+    #if 'runonce' in exc and int(k) != os.getpid():
+        #try:
+            #if argv[1] == args[0]:
+                #print('already running:',k,exc)
+                #raisewin(k)
+                #exit()
+        #except IndexError:
+            #continue
+#
+#os.system(' '.join(argv[1:]))

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+mainpath=`dirname $0`
+maindir=/data
+dnames=maindir
+dnames+=" /home"
+#~ dnames+=" /"
+#~ dnames+=" /win"
+
+if test -d $maindir && test `stat $maindir -c %d` -eq 2053; then
+    echo true
+else
+    echo false
+fi
+
+for dname in $dnames; do
+    bname="$mainpath"
+    bname+="$dname"
+    echo $bname
+done

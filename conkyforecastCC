@@ -1,0 +1,3 @@
+#!/bin/sh
+
+conkyForecast -lUSMA0230  -s0 -e4 -S3 -idCC

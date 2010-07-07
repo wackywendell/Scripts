@@ -1,0 +1,15 @@
+#!/bin/bash
+
+
+if [[ ! -r "$1" ]]; then
+    echo "Input file not readable or not a file"
+elif [[ ! -n "$4" ]]; then
+    echo "Output file needed"
+else
+    gs -dNOPAUSE -dBATCH -dFirstPage="$2" -dLastPage="$3" -sDEVICE=pdfwrite -sOutputFile="$4" "$1"
+    exit 0
+fi
+
+echo "Usage:"
+echo "pdfcut INPUTFILE FIRSTPAGENUMBER LASTPAGENUMBER OUTPUTFILE"
+exit -1

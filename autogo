@@ -1,0 +1,7 @@
+#!/bin/bash
+
+BASE=`basename $1 .go`
+
+# echo $BASE.8
+
+/home/wendell/go/bin/8g $1 && /home/wendell/go/bin/8l -o $BASE.out $BASE.8 && rm $BASE.8 && $BASE.out

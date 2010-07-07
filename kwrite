@@ -1,0 +1,1 @@
+/usr/bin/kwrite $@ 2>/dev/null

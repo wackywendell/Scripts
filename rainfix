@@ -1,0 +1,3 @@
+#!/bin/bash
+rm ~/.config/.rainlendar2/Rainlendar2-wendell
+rainlendar2 &

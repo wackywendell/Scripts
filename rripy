@@ -1,0 +1,5 @@
+cd ~/ipython
+bzr pull
+./setupegg.py develop
+cd docs
+make html

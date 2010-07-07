@@ -1,0 +1,108 @@
+#!/usr/bin/python
+
+import ldap
+from ldapfuncs import *
+from sys import argv
+from optparse import OptionParser
+from termcontrol import TerminalController
+
+term = TerminalController()
+
+noresults="No results returned."
+
+def joinqueries(iter):
+    "takes a list of queries and returns a list of sorted queries without duplicates"
+    pdict = dict()
+    for p in iter:
+        pdict[p.name] = p
+    retlist = pdict.values()
+    retlist.sort()
+    return retlist
+
+def generalquery(f='wendell', juststu=False):
+    """Searches name or nicknames for a given string.
+
+Returns a list, with each an instance of 'person'"""
+    ks = ['*' + q + '*' for q in f.split('*') if q]
+    
+    allqs = []
+    for k in ks:
+        allqs.append(orquery(CN=k,nickname=k))
+    
+    bigq = andquery(*allqs)
+    #print(str(bigq))
+    
+    try:
+        rets = queryqueries(str(bigq))
+    except ldap.SIZELIMIT_EXCEEDED, e:
+        print "Size limit exceeded!"
+        return None
+    retppl = [person(p) for p in rets]
+    if juststu:
+        retppl = [p for p in retppl if testcls(p.year)]
+    plist = joinqueries(retppl)
+    return plist
+
+def printquery(*args, **kwargs):
+    "Prints the results for a query"
+    lst = generalquery(*args, **kwargs)
+    tableline = term.render('${BOLD}%s${NORMAL}' % person.tablestr.strip())
+    if term.COLS:
+        tableline = term.render('${BOLD}%s${NORMAL}' %
+                                     person.tablestr[:term.COLS])
+    
+    if lst:
+        print tableline
+        for p in lst:
+            print makeprintable(str(p)).strip()
+    elif lst == []:
+        print noresults
+
+def longquery(*args, **kwargs):
+    "Prints the results for a query in long format"
+    lst = generalquery(*args, **kwargs)
+    if lst:
+        for p in lst:
+            print ("-"*80)
+            p.longprint()
+    elif lst == []:
+        print noresults
+
+def longlongquery(*args, **kwargs):
+    "Prints the results for a query in longlong format"
+    lst = generalquery(*args, **kwargs)
+    if lst:
+        for p in lst:
+            print ("-"*80)
+            p.longlongprint()
+    elif lst == []:
+        print noresults
+
+optparser = OptionParser()
+optparser.add_option("-a", "--all", dest="all",
+            action="store_true", default=False,
+            help="Search all people in the directory, not just students")
+optparser.add_option("-l", "--long", dest="long", action="store_true",
+                    help="Show all fields")
+optparser.add_option("-L", "--long-long", dest="longlong", action="store_true",
+                     help="Show all fields in entirety, can be LONG")
+            
+optparser.prog = 'dldap'
+optparser.usage = ('''\
+%prog [options] SEARCHSTRING
+Searches the Dartmouth LDAP directory (similar to DND).
+Search looks for SEARCHSTRING anywhere within name or nick).
+SEARCHSTRING may contain spaces, and an asterisk may be used to
+indicate an unknown substring.''')
+
+if __name__ == '__main__':
+    (opts, args) = optparser.parse_args()
+    if len(args) >= 1:
+        f=printquery
+        if opts.long:
+            f=longquery
+        elif opts.longlong:
+            f=longlongquery
+        f("*".join(args), not opts.all)
+    else:
+        optparser.print_help()

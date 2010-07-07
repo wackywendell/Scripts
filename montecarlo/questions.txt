@@ -1,0 +1,3 @@
+Where do I start the loop? Random?
+
+How do I set up the initial Hamiltonians?

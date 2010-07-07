@@ -1,0 +1,3 @@
+#!/bin/sh
+
+kwrite "$@" 2>/dev/null

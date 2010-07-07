@@ -1,0 +1,7 @@
+#!/bin/bash
+
+USER=cecilian
+HOST=66.147.244.150
+read -srp "Password for $USER@$HOST: " PASSWORD
+echo ''
+sudo curlftpfs -o allow_other "ftp://$USER:$PASSWORD@$HOST" /media/ftp

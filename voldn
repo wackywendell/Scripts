@@ -1,0 +1,2 @@
+amixer -q set Master 3- unmute
+amixer -q set Headphone 3- unmute

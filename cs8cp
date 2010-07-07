@@ -1,0 +1,19 @@
+#!/bin/bash
+
+cd /data/wendell/college/cs8ta/assignmentsall
+fromdir=/u/cs8/Mail/*
+serv=wendell@tahoe.cs.dartmouth.edu
+
+rsync -rltDvv --progress $serv:$fromdir .
+
+ppl="porter_w_diehl aleksandar_r_gabrovski jason_k_goodman ken_c_greim samuel_m_lloyd"
+
+#~ cd /data/wendell/college/cs8ta/assignmentsall
+
+#~ rm -rf ../assignments/*
+
+for p in $ppl; do
+    echo "assignmentsall/*/$p"
+    #~ cp -r --parents */$p ../assignments
+    rsync -rRt */$p ../assignments
+done

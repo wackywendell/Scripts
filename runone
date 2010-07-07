@@ -1,0 +1,50 @@
+#!/bin/bash
+
+declare -a args
+
+n=0
+for arg
+do
+	args[$n]="$arg"
+	let n++
+	if [[ $n==1 ]]; then
+		args[1]="--class=${1}"runone
+		let n++
+	fi
+done
+
+wmctrl -xa "${1}"runone && echo "Window raised; finishing" && exit
+
+echo "Window not found; running" ${args[*]}
+exec ${args[*]}
+
+exit
+
+pid=`pgrep $1`
+wmclass=`wmctrl -lx | grep $1 | awk '{print $3}'`
+echo $pid
+echo $wmclass
+
+if (pgrep $1 > /dev/null); then
+    echo "Running..."
+fi
+#
+#echo 123
+#ps a-ef | grep "runone $1" | wc -l
+#echo 56
+#ps -ef | awk '{print $8,$9,$10,$11,$12}' | grep "\"$@\""
+#
+#echo "ps -ef | awk '{print \$8,\$9,\$10,\$11,\$12}' | grep $@"
+#
+#
+#lines=`ps -ef | awk '{print $8}' | grep $1`
+
+#echo "lines: $lines"
+#
+#if [[ $lines > 2 ]]; then
+    #echo "Already running"
+    #echo $lines
+#else
+    #echo "Running $@"
+    #$@
+#fi

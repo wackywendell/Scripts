@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# MakeCompile
+
+# Run Compiler and Linker for 8g, 8l
+# In 32 bit environment replace 6's with 8's
+#     could test $GOARCH to make this automatic
+
+# To force environment variables when using non-interactive shell
+#    recommend setting environment variables in $HOME/.profile
+#export GOROOT=$HOME/go
+#export GOARCH=amd64
+#export GOOS=linux
+
+if [ -n "${1}" ]    # Test for command-line argument present
+then
+    GoSourceFileName="${1}"
+    GoBaseFileName="${GoSourceFileName%%.go}"  # Strips '.go'
+else
+    echo 'Please specify file name for MakeCompile'
+    exit 1
+fi
+
+echo "Compile     $GoSourceFileName"
+if  ! (8g -I. "${GoSourceFileName}")  # Test for compile failure
+then
+    exit 1     # No need for 'Compile Failed', outputs errors
+fi
+
+exit 0
+

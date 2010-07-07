@@ -1,0 +1,4 @@
+#!/bin/bash
+PYTHONPATH=$PYTHONPATH:/home/wendell/ipyzmq
+
+python /home/wendell/ipyzmq/IPython/core/iplib_$1.py

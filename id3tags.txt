@@ -1,0 +1,17 @@
+TALB - album
+TCOM - composer
+TCON - genre
+TEXT - lyrics, line with '/'
+	TIT1 - 'content group description', e.g. 'Piano Concerto'
+TIT2 - actual title
+	TIT3- subtitle
+	TLEN - length in time
+	TOLY - original lyricist/text writer
+	TOPE - original performer
+TPE1 - Lead artist(s)/Lead performer(s)/Soloist(s)/Performing group
+	TPE2 - Band/Orchestra/Accompaniment
+	TPE3 - Conductor
+	TPE4 - Interpreted/remixed/modified by
+TRCK - track number
+TYER - year of recording
+

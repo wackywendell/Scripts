@@ -1,0 +1,7 @@
+#!/bin/bash
+f=~/scripts/jpython
+if [ -f $f ]; then
+    PYTHONSTARTUP=$f
+fi
+
+python $f $@

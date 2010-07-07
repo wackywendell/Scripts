@@ -1,0 +1,5 @@
+#!/bin/bash
+echo Reading ${@:2}
+echo Outputting to $1
+
+ gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile=$1 "${@:2}"

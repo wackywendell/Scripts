@@ -1,0 +1,4 @@
+#!/bin/bash
+sudo cp /home/wendell/grubcustom "/etc/grub.d/40_custom"
+sudo chmod 755 "/etc/grub.d/40_custom"
+sudo update-grub

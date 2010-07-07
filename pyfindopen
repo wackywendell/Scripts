@@ -1,0 +1,54 @@
+#!/usr/bin/python
+
+import os
+import os.path as path
+from optparse import OptionParser
+import re
+from subprocess import Popen
+
+parser = OptionParser()
+parser.add_option("-m", "--match", action="store_true", dest="match",
+                  help="Pattern must match entire pathname", default=False)
+(options, args) = parser.parse_args()
+
+toploc = args[0]
+patt = args[1]
+
+print toploc
+print patt
+
+repatt = re.compile(patt, re.IGNORECASE)
+if options.match:
+    refunc = repatt.match
+else:
+    refunc = repatt.search
+
+pathlst = []
+
+try:
+    for (dirpath, dirnames, filenames) in os.walk(toploc):
+        for filename in filenames:
+            fullpath = path.join(dirpath, filename)
+            if refunc(fullpath):
+                pathlst.append(fullpath)
+                print "[%3d] %s" % (pathlst.index(fullpath), fullpath)
+except KeyboardInterrupt:
+    print "Keyboard interrupt."
+    exit()
+
+ranyet = False
+while not ranyet:
+    try:
+        num = int(raw_input(":"))
+    except KeyboardInterrupt:
+        print "Keyboard interrupt."
+        exit()
+    except ValueError:
+        print "Not a number."
+        continue
+    if num < 0 or num >= len(pathlst):
+        print "Number out of bounds."
+        continue
+    print num
+    Popen(["xdg-open",pathlst[num]])
+    ranyet = True

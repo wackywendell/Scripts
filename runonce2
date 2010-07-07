@@ -1,0 +1,87 @@
+#!/usr/bin/python
+
+from __future__ import (absolute_import, print_function, division, 
+                        unicode_literals)
+from future_builtins import filter, map, zip
+
+
+import os, sys, shelve
+from subprocess import Popen, PIPE
+import psi.process as proc
+from raisewin import raisewin
+
+dbasename = os.path.expanduser("~/.config/runonceshelf.db")
+# make certain we can open the database, at least for now...
+db = shelve.open(dbasename)
+db.close()
+del db
+
+class cmdmanager(object):
+    def __init__(self, cmd):
+        db = shelve.open(dbasename)
+        self.cmd = cmd
+        # see if the command is in the database
+        if cmd in db:
+            #print("Command is in database")
+            self.pid = db[cmd]
+        else:
+            #print("Command is NOT in database")
+            self.pid = None
+        # check that the process is running; if not, remove it
+        if self.pid:
+            try:
+                proc.Process(self.pid)
+                #print("Process still running")
+            except proc.NoSuchProcessError:
+                del db[cmd]
+                self.pid = None
+                #print("Process not still running")
+        db.close()
+        self.cleanup = False
+    
+    def setpid(self, pid):
+        if self.pid != None:
+            raise ValueError("This command already executed!")
+        db = shelve.open(dbasename)
+        db[self.cmd] = pid
+        self.pid = pid
+        db.close()
+        self.cleanup = True
+    
+    def __del__(self):
+        "remove object when its closed"
+        if self.cleanup:
+            #print("__del__ running, deleting from database")
+            db = shelve.open(dbasename)
+            if self.cmd in db and db[self.cmd] == self.pid:
+                del db[self.cmd]
+            db.close()
+
+def raisewin(pid):
+    wmproc = Popen("wmctrl -lp", shell=True,stdout=PIPE)
+    wmoutb = wmproc.communicate()[0]
+    wmout = wmoutb.decode('ascii','ignore')
+    #print(type(wmout), "wmout:",wmout)
+    wmoutlines = wmout.split('\n')
+    #print(type(wmoutlines), "wmoutlines:",wmoutlines)
+    for l in wmoutlines:
+        fields = [f for f in l.split(" ") if f]
+        #print(fields)
+        if len(fields) < 3:
+            continue
+        #print(fields[2],pid)
+        if int(fields[2]) == int(pid):
+            #print("RUNNING, raising...", pid, fields[0])
+            wmp = Popen("wmctrl -ia "+fields[0], shell=True)
+            wmp.wait()
+
+basename = os.path.split(sys.argv[1])[0]
+cmdman = cmdmanager(basename)
+if cmdman.pid:
+    raisewin(int(cmdman.pid))
+else:
+    p = Popen(sys.argv[1:])
+    cmdman.setpid(p.pid)
+    p.wait()
+    del cmdman
+    exit()

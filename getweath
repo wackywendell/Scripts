@@ -1,0 +1,214 @@
+#!/usr/bin/python
+
+# get format is
+# http://api.wunderground.com/auto/wui/geo/ForecastXML/index.xml?query=03755
+# where the query can be anything that makes sense for a query, such as
+# http://api.wunderground.com/auto/wui/geo/ForecastXML/index.xml?query=Hanover,NH
+# Postal codes work best, though; mistakes are less likely.
+# to test where it is going, you can go to
+# http://api.wunderground.com/auto/wui/geo/GeoLookupXML/index.xml?query=Hanover,NH
+
+# or wherever is appropriate.
+
+import urllib
+from xml.dom import minidom
+import os.path as path
+import time
+from optparse import OptionParser
+from sys import argv
+
+# something to change: we shouldn't download the file every time.
+# that said, for now, I am going to.
+
+# settings
+
+diftime=60 # of seconds in which to update
+minsize = 20 # minimum size of a file to be accepted as nonempty
+
+Hqry="03755"
+Hpws="KNHHANOV1"
+Hair="KLEB"
+
+Mqry="01944"
+Mpws="KMAGLOUC6"
+Mair="KBVY"
+
+Bqry="02101"
+Bpws="KMABOSTO22"
+Bair="KBOS"
+
+
+# other vars
+def tmpqry(qry):
+    return r"/tmp/weatherf" + (qry.replace(',','')) + ".xml"
+
+def tmppws(pws):
+    return r"/tmp/weatherc" + (pws.replace(',','')) + ".xml"
+
+def tmpair(air):
+    return r"/tmp/weatherc" + (air.replace(',','')) + ".xml"
+
+def qryhpath(qry):
+    return r"http://api.wunderground.com/auto/wui/geo/ForecastXML/index.xml?query="+qry
+
+def pwshpath(pws):
+    return  r"http://api.wunderground.com/weatherstation/WXCurrentObXML.asp?ID="+pws
+
+def airhpath(airp):
+    return r"http://api.wunderground.com/auto/wui/geo/WXCurrentObXML/index.xml?query="+airp
+
+def updatefile(onlinepath, fpath, dif, minsz=minsize):
+    def doupdate():
+        #~ print "Getting "+onlinepath
+        f = urllib.urlopen(onlinepath)
+        s = f.read()
+        if s:
+            fsave = open(fpath, "w")
+            fsave.write(s)
+            fsave.close()
+        return s
+    if not path.exists(fpath):
+        return doupdate()
+    if path.getsize(fpath) < minsz:
+        return doupdate()
+    if time.time() - path.getmtime(fpath) > dif:
+        return doupdate()
+    else:
+        oldf = open(fpath,"r")
+        s = oldf.read()
+        oldf.close()
+        return s
+
+def getchild(node, name):
+    #~ print node.nodeName
+    for child in node.childNodes:
+        #~ print child.nodeName
+        #~ try:
+            #~ print child.tagName
+        #~ except AttributeError:
+            #~ print "-no tag name"
+        if hasattr(child, "tagName") and child.tagName == name:
+            return child
+
+def followpath(node, *names):
+    newnode = node
+    for n in names:
+        newnode=getchild(newnode, n)
+    return newnode
+
+def pathtotxt(node, *names):
+    newnode = followpath(node, *names)
+    if newnode.firstChild:
+        return newnode.firstChild.nodeValue
+    else:
+        return "NO TEXT"
+
+def getcurtemp(doc, metric = False):
+    if not metric:
+        temp = pathtotxt(doc, "current_observation","temp_f") + u"\u00B0 F"
+    else:
+        temp = pathtotxt(doc, "current_observation","temp_c") + u"\u00B0 C"
+    #~ time = pathtotxt(doc, "current_observation", "observation_time")
+    #~ place = pathtotxt(doc, "current_observation", "location", "full")
+    return temp.encode('utf-8')
+
+optparser = OptionParser()
+optparser.add_option("-M", "--Manchester",
+            action="store_const", const=Mqry, dest='qry', default=Mqry,
+            help="Use Manchester, MA")
+optparser.add_option("-r", "--refresh",
+            action="store_true", dest='refresh', default=False,
+            help="Force refresh of data")
+optparser.add_option("-H", "--Hanover",
+            action="store_const", const=Hqry, dest='qry',
+            help="Use Hanover, NH")
+optparser.add_option("-B", "--Boston",
+            action="store_const", const=Bqry, dest='qry',
+            help="Use Boston, MA")
+optparser.add_option("-l", "--location", dest='qry', action="store",
+                    type='string', nargs=1,
+                    help="Use a given location for forecast")
+optparser.add_option("-p", "--pws", dest='pws', action="store",
+                    type='string', nargs=1,
+                    help="Use a given personal weather station for forecast")
+            
+optparser.prog = 'getweather'
+optparser.usage = ('''\
+%prog [options]
+Get current conditions at a specified location.''')
+
+def parseargs():
+    (opts, args) = optparser.parse_args()
+    locdict={Mqry:(Mpws, Mair), Bqry:(Bpws,Bair), Hqry:(Hpws,Hair)}
+    qry = opts.qry
+    pws = opts.pws
+    airp=""
+    if not opts.pws:
+        if qry in locdict:
+            (pws,airp) = locdict[qry]
+        else:
+            raise KeyError('No Weather Station specified.')
+    
+    dtime = diftime
+    if opts.refresh:
+        dtime=0
+    
+    return (qry, pws, airp, dtime)
+
+def main():
+    global xmlweather, xmlcurrent
+    
+    (qry, pws, airp, dtime) = parseargs()
+    
+    hpathq = qryhpath(qry)
+    hpathp = pwshpath(pws)
+    hpatha = airhpath(airp)
+    
+    tmpq = tmpqry(qry)
+    tmpp = tmppws(pws)
+    tmpa = tmpair(airp)
+    
+    #~ print "Query:", qry, "; PWS:", pws
+    
+    sq = updatefile(hpathq, tmpq, dtime)
+    sp = updatefile(hpathp, tmpp, dtime)
+    sa = updatefile(hpatha, tmpa, dtime)
+    xmlq = minidom.parseString(sq)
+    xmlp = minidom.parseString(sp)
+    xmla = minidom.parseString(sa)
+    
+    global n
+    temp = getcurtemp(xmla)
+    print temp
+
+def printnode(node):
+    print node.nodeName
+    if node.hasChildNodes():
+        for c in node.childNodes:
+            print c.nodeName
+
+#~ def getweather(n):
+    #~ n = n.lower()
+    #~ d = {'chanceflurries' = ''
+        #~ 'chancerain' = ''
+        #~ 'chancesleet' = ''
+        #~ 'chancesnow' = ''
+        #~ 'chancetstorms' = ''
+        #~ 'clear' = ''
+        #~ 'cloudy' = ''
+        #~ 'flurries' = ''
+        #~ 'fog' = ''
+        #~ 'hazy' = ''
+        #~ 'mostlycloudy' = ''
+        #~ 'mostlysunny' = ''
+        #~ 'partlycloudy' = ''
+        #~ 'partlysunny' = ''
+        #~ 'rain' = ''
+        #~ 'sleet' = ''
+        #~ 'snow' = ''
+        #~ 'sunny' = ''
+        #~ 'tstorms' = ''
+        #~ 'unknown' = ''}
+
+if __name__ == "__main__":
+    main()

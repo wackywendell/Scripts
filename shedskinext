@@ -1,0 +1,5 @@
+#!/bin/bash
+
+bname=`basename $1 .py`
+
+shedskin -e $1 && make && rm Makefile $bname.hpp $bname.cpp

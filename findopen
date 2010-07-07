@@ -1,0 +1,22 @@
+#!/bin/bash
+
+num=$1
+loc=$2
+patt=$3
+
+echo $loc
+
+fls="find $loc -type f -iname *$patt*"
+echo -e $fls
+fls=`$fls`
+echo $fls
+
+curnum=1
+
+for i in $fls; do
+    if [ $curnum == $num]; then
+        
+
+echo "opening file $fl"
+
+# xdg-open $fl

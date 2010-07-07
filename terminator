@@ -1,0 +1,9 @@
+import sys, os
+import flock
+sys.path = ["/usr/share/terminator"] + sys.path
+
+mylock = flock.flock(os.path.expanduser("~/.config/terminator.lock"))
+
+if mylock.acquire():
+    execfile("/usr/bin/terminator")
+    mylock.release()

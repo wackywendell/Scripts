@@ -1,0 +1,24 @@
+#!/bin/bash
+
+loc=`cat ~/scripts/weather/weatherloc.txt`
+
+ex="conkyForecast -il$loc -d "
+
+function parg {
+    # takes three args:
+    # 0: length, 1: start day, and 2: type
+    printf "%3s\n" `conkyForecast -s $2 -d $3`;
+}
+
+function pday {
+    printf "%10s %15s, %5s/%5s" "`$ex DW -s $1`" "`$ex CC -s $1`" "`$ex LT -s $1`" "`$ex HT -s $1`" ;
+}
+
+echo \
+"Weather in `$ex CN`, `$ex CO` from `$ex OB` as of `$ex LU -m0` (fetched `$ex LF -m0`)
+Current: `$ex CC`, `$ex HT`, Feels like `$ex LT`
+`pday 0`
+`pday 1`
+`pday 2`
+`pday 3`
+`pday 4`"

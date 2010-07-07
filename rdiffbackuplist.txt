@@ -1,0 +1,8 @@
+- /proc
+- /mnt
+- /media
+- /tmp
+- /cdrom
+- /dev
+- /lost+found
+- /sys

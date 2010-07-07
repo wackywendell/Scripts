@@ -1,0 +1,13 @@
+#!/bin/bash
+if [ `setxkbmap -print | grep xkb_symbols | awk '{print $4}' | awk -F"+" '{print $2}'` = us ]; then
+    echo "US";
+    echo "changing to DE...";
+    setxkbmap de ;
+else
+    echo "DE";
+    echo "Changing to US...";
+    setxkbmap us ;
+fi
+
+sleep .1
+xmodmap ~/.xmodmaprc

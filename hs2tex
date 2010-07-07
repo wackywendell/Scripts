@@ -1,0 +1,30 @@
+#!/bin/bash
+
+for arg; do
+    fn=`basename "$arg" .hs`
+    d=`dirname "$arg"`
+    f=$d/$fn
+    
+    touch $f.tex
+    echo $f.tex
+    echo "\documentclass{article}" > $f.tex
+    echo "\usepackage{listings}" >> $f.tex
+    echo "\usepackage{geometry}" >> $f.tex
+    echo "\geometry{verbose,letterpaper,tmargin=0.75in,bmargin=0.75in,lmargin=0.75in,rmargin=0.75in}" >> $f.tex
+
+    echo "\begin{document}" >> $f.tex
+    echo "\begin{lstlisting}[basicstyle={\footnotesize\sffamily},breaklines=true,showstringspaces=false,breakautoindent=true,frame=leftline,firstnumber=1,numberfirstline=false,numbers=left,stepnumber=5,language=Haskell]"  >> $f.tex
+    
+    cat "$f.hs" >> $f.tex
+    echo "\end{lstlisting}" >> $f.tex
+    echo "\end{document}" >> $f.tex
+    
+    pdflatex $f.tex
+    
+    if [ -f $f.log ]; then
+        rm $f.log
+    fi
+    if [ -f $f.aux ]; then
+        rm $f.aux
+    fi
+done

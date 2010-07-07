@@ -1,0 +1,11 @@
+#!/usr/bin/env ipython
+
+from __future__ import print_function
+from myspath import path
+
+out=path('~/media/NIGEL/.rockbox')
+
+print("TEST!")
+out=!ls -al
+out = out[1:]
+print(type(out))

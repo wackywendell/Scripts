@@ -1,0 +1,60 @@
+Current myspath abilities:
+abspath
+access -> X
+chdir -> Dir.chdir
+chmod
+chown
+chroot -> X
+copy
+count
+curdir -> _curdir
+cwd -> Dir
+exists
+expanduser -> norm
+expandvars -> norm
+extension
+getdirs -> Dir.walk
+getfiles -> Dir.walk
+glob -> X
+index
+isabs
+isdir
+isfile
+islink
+ismount
+isrel
+lchown -> Link
+lexists -> Link
+lglob -> X
+link -> Link
+lisdir -> Link
+lisfile -> Link
+lstat -> Link
+makedirs -> Dir
+match -> X
+mkdir -> Dir
+mkfifo -> File
+mknod -> File
+move
+normcase -> X
+normcasestr -> X
+pardir -> X
+pathconf -> X
+readlink
+readlinkpath -> Link
+realpath
+relpathto
+remove
+removedirs -> X
+rename
+rmdir -> Dir
+rmtree -> X
+samefile -> sameas
+stat
+statvfs
+touch -> File
+utime
+writelink -> Link
+
+things to test:
+Dir.walk!!!

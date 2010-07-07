@@ -1,0 +1,6 @@
+- gpodder
+- audiobook/*Tolkien*
+- audiobook/Brisingr
+- */cover
+- podcast/PRI
+P *.bmark

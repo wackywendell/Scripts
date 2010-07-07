@@ -1,0 +1,6 @@
+#!/bin/bash
+
+f=`mktemp`
+
+man -Tps $1 > "$f"
+evince "$f" &

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# use sudoedit /etc/sudoers to get no password needed
+# %sudo ALL=NOPASSWD: /etc/acpi/sleep.sh, /sbin/shutdown
+#terminator &
+
+
+#gnome-screensaver-command -l
+#sudo /etc/acpi/sleep.sh
+
+notify-send --icon computer "Suspending to RAM" "The computer is going to sleep now." &
+sleep 1
+gnome-screensaver-command -l
+sleep 2
+qdbus --system org.freedesktop.Hal /org/freedesktop/Hal/devices/computer org.freedesktop.Hal.Device.SystemPowerManagement.Suspend 0
+
+#dbus-send \
+#--session \
+#--dest=org.freedesktop.PowerManagement \
+#--type=method_call \
+#--print-reply \
+#--reply-timeout=2000 \
+#/org/freedesktop/PowerManagement \
+#org.freedesktop.PowerManagement.Suspend

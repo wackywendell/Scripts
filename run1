@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if [ `pgrep $1` ]; then
+    echo "Started";
+else
+    $@
+fi
