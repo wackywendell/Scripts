@@ -10,18 +10,24 @@ echo "------------------------------------------------"
 if [[ ! -d /media/NIGEL/.rockbox ]] ; then
     echo "MOUNTING..."
     sudo mount -t vfat '/dev/disk/by-id/usb-Apple_iPod_00000098DCFB-0:0-part2' /media/NIGEL -o'uid=1001,gid=1001,shortname=mixed'
+    mounted=True
     echo "------------------------------------------------"
 fi
 
 if [[ ! -d /media/NIGEL/.rockbox ]] ; then
-    echo "Device still does not exist. Is the ipod plugged in?"
+    echo "Device does not exist. Is the ipod plugged in?"
     exit 2
 fi
 
+# use -n for dry-run
 command="rsync -vrlt --modify-window=3 --delete-excluded --exclude-from "$excludefile" /data/mp3/ /media/NIGEL/audio"
 echo $command
 $command
 
-echo "EJECTING..."
-sudo eject /media/NIGEL
+df -BM /media/NIGEL
+
+if [[ -n $mounted ]] ; then
+    echo "EJECTING..."
+    sudo eject /media/NIGEL
+fi
 echo "Done!"

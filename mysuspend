@@ -11,7 +11,7 @@
 notify-send --icon computer "Suspending to RAM" "The computer is going to sleep now." &
 sleep 1
 gnome-screensaver-command -l
-sleep 2
+sleep 1
 qdbus --system org.freedesktop.Hal /org/freedesktop/Hal/devices/computer org.freedesktop.Hal.Device.SystemPowerManagement.Suspend 0
 
 #dbus-send \

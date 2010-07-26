@@ -1,0 +1,51 @@
+#!/usr/bin/env ipython
+
+import pynotify
+from myspath import path
+
+olddir = path('.').abspath()
+title="VBB Update"
+logfile='S7.log'
+!echo `date` > $logfile
+_=pynotify.init(title)
+note=pynotify.Notification(title, "Downloading...",'network')
+_=note.set_timeout(pynotify.EXPIRES_NEVER)
+_=note.show()
+dir=path("/home/wendell/Dropbox/Us/Germany Documents/berlin transportation")
+myfile = (dir[:-1] + 'vbb update/PLAN1.ZIP')
+olddate = 0
+try:
+	olddate = (dir[:-1] + 'vbb update/PLAN1.ZIP').stat().mtime
+except Exception as e:
+	print("Trouble getting date, perhaps file deleted.")
+	print(e)
+dir.chdir()
+f1='http://www.s-bahn-berlin.de/fahrplanundnetz/pdf/MoFr_BGWD_Richtung_BWKR.pdf'
+f2='http://www.s-bahn-berlin.de/fahrplanundnetz/pdf/MoFr_BGWD_Richtung_BNIS.pdf'
+f3='http://www.s-bahn-berlin.de/fahrplanundnetz/pdf/SaSo_BGWD_Richtung_BWKR.pdf'
+f4='http://www.s-bahn-berlin.de/fahrplanundnetz/pdf/SaSo_BGWD_Richtung_BNIS.pdf'
+f5='http://www.s-bahn-berlin.de/pdf/VBB-Liniennetz.pdf'
+f6='http://www.s-bahn-berlin.de/pdf/S+U-Liniennetz.pdf'
+zf='http://www.vbbonline.de/software/WINKOMP526.ZIP'
+
+!wget -qN --retry-connrefused $f1 $f2 $f3 $f4 $f5 $f6
+
+!unzip -quo WINKOMP526.ZIP -d"../vbb update"
+
+newdate = (dir[:-1] + 'vbb update/PLAN1.ZIP').stat().mtime
+_=note.set_timeout(1000)
+_=note.set_timeout(pynotify.EXPIRES_DEFAULT)
+if newdate != olddate:
+	_=note.update(title, "Running setup!",'network')
+	_=note.show()
+	!wine "../vbb update/SETUP.EXE"	
+else:
+	import time, datetime
+	#	mytime = time.gmtime(olddate)
+	#	mydate = datetime.datetime(mytime.tm_year, mytime.tm_month, mytime.tm_day)
+	mytime = time.gmtime(olddate)
+	mydate = time.strftime('%D %T', mytime)
+	_=note.update(title, "Fahrplan info is already up to date.\nLast updated " + str(mydate),'network')
+	_=note.show()
+
+olddir.chdir()
