@@ -2,8 +2,10 @@
 # -*- coding: iso-8859-1 -*-
 """ fpath.py - provides objects for representations of paths, files, dirs, and links.
 
-Based on Noam Raphael's implementation of a path as tuple, which is in turn ased on the path module by Jason Orendorff
+Based on Noam Raphael's implementation of a path as tuple, which is in turn based on the path module by Jason Orendorff
 (http://www.jorendorff.com/articles/python/path)
+
+This module presents 5 main objects: Path, Dir, File, Link, and Stats. A Path object is a tuple of directories and finally a possible file name, with useful Path operations as methods. Dir, File, and Link all derive from the Path object, and have additional methods (such as mkdir, touch, readlink, respectively)  that are useful for the type of object that it is. A Stats object (made with Stats(some_path_object), Stats(some_path_string), or some_path_object.stat()) represents properties of the object at that path, which can be read and sometimes set. See object documentation for more help.
 """
 
 import os
@@ -20,10 +22,10 @@ class Stats(object):
     Properties are read from os.stat(), and set with the appropriate methods.
     """
     def __init__(self, path, usecache = True, followlinks = True):
-        """path may be a Path, Dir, ... object, a str, or unicode path.
+        """path may be a Path object (or descendant), a str, or unicode path.
         
-    With cache enabled, it makes one stat call on creation, and uses that to return each property.
-    With cache disabled, no stat() call is made on instantiation, but instead one is required for each property access.
+        With cache enabled, it makes one stat call on creation, and uses that to return each property.
+        With cache disabled, no stat() call is made on instantiation, but instead one is required for each property access.
     
     With followlinks = False, an os.lstat() call is used, returning properties on the link file itself instead of the file or directory it is pointing to."""
         self._path = Path(path)
@@ -47,9 +49,11 @@ class Stats(object):
     @property
     def isdir(self):
         return stat.S_ISDIR(self._stat().st_mode)
+
     @property
     def isfile(self):
         return stat.S_ISREG(self._stat().st_mode)
+    
     @property
     def islink(self):
         return stat.S_ISLNK(self._stat().st_mode)
@@ -58,14 +62,17 @@ class Stats(object):
     def mode(self):
         """File permissions"""
         self._stat().st_mode % 01000
+    
     @mode.setter
     def mode(self, mode):
         os.chmod(unicode(self._path), mode)
         self._stat(True)
+
     @property
     def owner(self):
         """The owner of the file in a (uid, gid) tuple"""
         return (self._stat().st_uid, self._stat().st_gid)
+    
     @owner.setter
     def owner(self, (uid, gid)):
         os.chown(unicode(self._path), uid, gid)
@@ -75,19 +82,39 @@ class Stats(object):
     def size(self):
         """Size in bytes"""
         return self._stat().st_size
+
+    @property
+    def atime(self):
+        """Access time.
+        
+        Access and modification times must be set together using Stat.amtime"""
+        s = self._stat()
+        return s.st_atime
+
+    @property
+    def mtime(self):
+        """Modification time.
+        
+        Access and modification times must be set together using Stat.amtime"""
+        s = self._stat()
+        return s.st_mtime
+
     @property
     def amtime(self):
         """Access and modification times in a (atime, mtime) tuple."""
         s = self._stat()
         return (s.st_atime, s.st_mtime)
+
     @amtime.setter
     def amtime(self, (atime, mtime)):
         os.utime(unicode(self._path), (atime, mtime))
         self._stat(True)
+    
     @property
     def ctime(self):
         """Creation time"""
         return self._stat().st_ctime
+
 
 class BasePath(tuple):
     """ The base, abstract, path type.
@@ -208,16 +235,17 @@ class BasePath(tuple):
         
         If arg isn't given, an empty path, which represents the current
         working directory, is returned.
+        If arg is already an instance of cls (and not a derived class), arg is returned.
         If arg is a string, it is parsed into a logical path.
         If arg is an iterable over path elements, a new path is created from
         them.
         """
         if arg is None:
             return tuple.__new__(cls)
+        if isinstance(arg, cls) and type(arg) is cls:
+            return arg
         elif isinstance(arg, BasePath):
             return tuple.__new__(cls, arg)
-            # return arg - old, doesn't deal with derived classes being
-            # converted to this type
         elif isinstance(arg, cls._OSBaseRoot):
             return tuple.__new__(cls, (arg,))
         elif isinstance(arg, basestring):
@@ -234,7 +262,6 @@ class BasePath(tuple):
         # 
         # This is a default implementation, which may be overriden by
         # subclasses (form example, MacPath)
-        #import ipdb; ipdb.set_trace()
         if not self:
             return self._curdir
         elif isinstance(self[0], self._OSBaseRoot):
@@ -286,15 +313,20 @@ class BasePath(tuple):
     # Wrap a few tuple methods to return path objects
 
     def __add__(self, other):
-        other = self.__class__(other)
+        cls = self._Path
+        if isinstance(other, BasePath):
+            cls = other.__class__
+        else:
+            other = cls(other)
         if not other.isrel:
             raise ValueError, "Right operand should be a relative path"
-        return self.__class__(itertools.chain(self, other))
+        return cls(itertools.chain(self, other))
 
     def __radd__(self, other):
         if not self.isrel:
             raise ValueError, "Right operand should be a relative path"
-        other = self.__class__(other)
+        if not isinstance(other, BasePath):
+            other = self.__class__(other)
         return self.__class__(itertools.chain(other, self))
     
     def __getslice__(self, i,j):
@@ -437,7 +469,7 @@ class BasePath(tuple):
         
         With followlinks = False, a path that is a link to a separate file or folder (or nothing) is returned as a Link object.
         
-        With selfonerr = False, paths that do not exist will raise Errors. The default behavior is to return a Path object
+        With pathonerr = False, paths that do not exist will raise Errors. The default behavior is to return a Path object
         """
         try:
             s = self.stat(True, followlinks)
@@ -523,6 +555,9 @@ class BasePath(tuple):
     # startfile (NTPath)
 
 class BaseFile(BasePath):
+    def __init__(self, arg):
+        return BasePath.__init__(self, arg)
+
     def __repr__(self):
         return 'File(%r)' % unicode(self)
     def _getnotend(self, tpl):
@@ -540,6 +575,9 @@ class BaseFile(BasePath):
     def open(self, *args, **kwargs):
         """Return a file object that can be read"""
         return open(unicode(self))
+
+    def __add__(self, other):
+        raise ValueError, "File objects not supported as left operand"
 
 class BaseDir(BasePath):
     def __repr__(self):
@@ -560,77 +598,48 @@ class BaseDir(BasePath):
     def remove(self):
         os.rmdir(unicode(self))
     
-    def children(self, descend=False, followlinks=False):
-        if not descend:
-            for child in os.listdir(unicode(self)):
-                pchild = self._Path(child).get(followlinks)
-                yield pchild
-            return
-        
-        # only if descend
-        childdirs = []
+    def children(self):
         for child in os.listdir(unicode(self)):
-                pchild = self._Path(child).get(followlinks)
-                yield pchild
-                if isinstance(pchild, BaseDir):
-                    childdirs.append(pchild)
-        for child in childdirs:
-            for subchild in child.children(descend, followlinks):
-                yield subchild
-            
+            pchild = (self + child)
+            yield pchild
+        return
         
-        
-    def walk(self, descend = True, dirs = True, files = True, links = False):
+    def walk(self, dirs = True, files = True, links = False):
         """Yields subdirectories and files in the path.
         Args:
-        descend (default False): Set to True to descend into subdirectories and also yield subsubdirectories, etc.
         dirs (default True): yield subdirectories
         files (default True): yield inner files
         links (default False): yield links as Link objects, not Dir or File objects"""
-        for (dirpath, dirnames, filenames) in os.walk(unicode(self)):
-            curpath = self.__class__(dirpath)
-            if descend and dirs:
-                yield curpath
-            if not descend and dirs:
-                for d in dirnames:
-                    obj = self._Dir(curpath + d)
-                    s = obj.stat(followlinks=False)
-                    if links and s.islink:
-                        obj = Link(obj)
-                    yield obj
-            if files:
-                for f in filenames:
-                    obj = self._File(curpath + d)
-                    s = obj.stat(followlinks=False)
-                    if links and s.islink:
-                        yield Link(obj)
-                    yield obj
-            if not descend:
-                break
-            
+        for child in self.children():
+            s = child.stat(usecache=True, followlinks=not links)
+            if s.isdir:
+                child = self._Dir(child)
+                if dirs:
+                    yield child
+                for c in child.walk(dirs, files, links):
+                    yield c
+            elif files and s.isfile:
+                yield self._File(child)
+            elif s.islink and links:
+                yield self._Link(child)
+            else:
+                # what do you do if it isn't a file, link, or dir?
+                # I think you yield it anyway, as a path
+                yield child
 
 class BaseLink(BasePath):
+    def __init__(self, arg):
+        return BasePath.__init__(self, arg)
+
     def __repr__(self):
         return 'Link(%r)' % unicode(self)
+    
     def _getnotend(self, tpl):
         """Allows subclasses to define what class is returned if the slice requested does not include the final path piece"""
         return self._Dir(tpl)
     
-    def stat(self):
-        return StatWrapper(os.lstat(unicode(self)))
-
-    def linkstodir(self):
-        try:
-            return self.stat().lisdir
-        except OSError:
-            return False
-
-    def linkstofile(self):
-        try:
-            return self.stat().lisfile
-        except OSError:
-            return False
-
+    def __add__(self, other):
+        raise ValueError("Link objects not supported as left operands")
 
 # the associated types that go with it
 BasePath._Path = BasePath
@@ -657,7 +666,7 @@ class PosixPath(BasePath):
             return '/'
 
         def __repr__(self):
-            return 'path.ROOT'
+            return 'Path.Root'
 
         isabs = True
 
@@ -697,9 +706,6 @@ class PosixPath(BasePath):
 
     # --- Info about the path
 
-    def statvfs(self):
-        """ Perform a statvfs() system call on this path. """
-        return os.statvfs(unicode(self))
 
     def sameas(self, other):
         other = self.__class__(other)
@@ -734,11 +740,14 @@ class PosixDir(PosixPath, BaseDir):
     pass
     
 class PosixLink(PosixPath, BaseLink):
-    def readlink(self, abs = False):
-        """ Return the path to which this symbolic link points. """
-        linkpath = (self.readlink())
-        if linkpath.isrel and abs:
-            return self + linkpath
+    def readlink(self, realpath = False):
+        """ Return the path to which this symbolic link points. 
+        
+        Normally returns a path relative to the link; use
+        realpath = True to get a path to the main object"""
+        linkpath = self._Path(os.readlink(unicode(self)))
+        if linkpath.isrel and realpath:
+            return (self[:-1] + linkpath).realpath()
         else:
             return linkpath
     
@@ -753,9 +762,9 @@ class PosixLink(PosixPath, BaseLink):
     def writelink(self, src):
         """ Create a symbolic link at self, pointing to src.
 
-        src may be any string. Note that if it's a relative path, it
-        will be interpreted relative to self, not relative to the current
-        working directory.
+        src may be any string or Path object. Note that if it's a 
+        relative path, it will be interpreted relative to self, not 
+        relative to the current working directory.
         """
         os.symlink(unicode(src), unicode(self))
 
@@ -839,7 +848,7 @@ class NTPath(BasePath):
             return '%s:' % self.letter
 
         def __repr__(self):
-            return 'path.UnrootedDrive(%r)' % self.letter
+            return 'Path.UnrootedDrive(%r)' % self.letter
 
         isabs = False
 
@@ -868,7 +877,7 @@ class NTPath(BasePath):
             return '\\\\%s\\%s\\' % (self.host, self.mountpoint)
 
         def __repr__(self):
-            return 'path.UNCRoot(%r, %r)' % (self.host, self.mountpoint)
+            return 'Path.UNCRoot(%r, %r)' % (self.host, self.mountpoint)
 
         isabs = True
             
@@ -972,8 +981,11 @@ NTPath._Link = NTLink
 
 if os.name == 'posix':
     Path, File, Dir, Link = PosixPath, PosixFile, PosixDir, PosixLink
+    Root = Path.ROOT
 elif os.name == 'nt':
     Path, File, Dir, Link = NTPath, NTFile, NTDir, NTLink
+    Drive, UnrootedDrive, UNCRoot = Path.Drive, Path.UnrootedDrive, Path.UNCRoot
+
 else:
     raise NotImplementedError, \
           "The path object is currently not implemented for OS %r" % os.name

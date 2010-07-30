@@ -2,6 +2,8 @@
 
 excludefile=/home/wendell/scripts/ipodexclude.txt
 
+/home/wendell/scripts/mygpo.py
+
 command="python /home/wendell/scripts/id3simple.py"
 echo $command
 $command

@@ -127,7 +127,17 @@ thinking = Directory('Thinking Allowed',
 thinking.artist = 'BBC'
 thinking.album = 'Thinking Allowed'
 
-thor = Directory('The History of Rome',
+sof = speakingoffaith = Directory('Speaking of Faith',
+                path("/home/wendell/Music/gpodder/APM_ Speaking of Faith with Krista Tippett"),
+                path("/home/wendell/Music/podcast/Speaking_of_Faith"))
+sof.artist = 'Krista Tippett'
+sof.album = 'Speaking of Faith'
+@sof.newfix
+def fix(self, f, printout=True):
+    self.defaultfix(f,printout)
+    f['track'] = ''
+
+historyofrome = thor = Directory('The History of Rome',
     path("/data/mp3/gpodder/The History of Rome/"),
     path("/home/wendell/Music/podcast/Mike_Duncan/The_History_Of_Rome"))
 thor.artist = 'Mike Duncan'
