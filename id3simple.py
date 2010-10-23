@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 import re
-from id3man import *
+from id3man import id3walk, filesanitize
 from myspath import path
 
 mainbasedir = path('/home/wendell/Music/gpodder/')
@@ -128,12 +128,12 @@ thinking.artist = 'BBC'
 thinking.album = 'Thinking Allowed'
 
 sof = speakingoffaith = Directory('Speaking of Faith',
-                path("/home/wendell/Music/gpodder/APM_ Speaking of Faith with Krista Tippett"),
+                path("/home/wendell/Music/gpodder/Speaking of Faith"),
                 path("/home/wendell/Music/podcast/Speaking_of_Faith"))
 sof.artist = 'Krista Tippett'
 sof.album = 'Speaking of Faith'
 @sof.newfix
-def fix(self, f, printout=True):
+def sof_fix(self, f, printout=True):
     self.defaultfix(f,printout)
     f['track'] = ''
 
@@ -143,8 +143,9 @@ historyofrome = thor = Directory('The History of Rome',
 thor.artist = 'Mike Duncan'
 thor.album = 'Rome'
 thor.genre = 'Podcast'
+
 @thor.newfix
-def fix(self, f, printout=True):
+def thorfix(self, f, printout=True):
     self.defaultfix(f, printout)
     t = f['title']
     t = t.replace('-The History of Rome', '')
@@ -173,13 +174,13 @@ def fix(self, f, printout=True):
     printout and print("new filename:", f.filename)
         
 norman= Directory('Norman Centuries',
-    path("/home/wendell/Music/gpodder/Norman Centuries | A Norman History Podcast by Lars Brownworth (2)"),
+    path("/home/wendell/Music/gpodder/Norman Centuries"),
     path("/home/wendell/Music/podcast/Lars_Brownworth/Norman_Centuries"))
 norman.artist = 'Lars Brownworth'
 norman.album = 'Norman Centuries'
 
 byzantine = Directory('12 Byzantine Rulers',
-    path("/home/wendell/Music/gpodder/12 Byzantine Rulers_ The History of The Byzantine Empire"),
+    path("/home/wendell/Music/gpodder/12 Byzantine Rulers"),
     path("/home/wendell/Music/podcast/Lars_Brownworth/Byzantine_Rulers"))
 byzantine.artist = 'Lars Brownworth'
 
@@ -188,8 +189,9 @@ fooc=Directory('From Our Own Correspondent',
     path("/data/mp3/gpodder/From Our Own Correspondent"),
     path("/data/mp3/podcast/From_Our_Own_Correspondent"))
 fooc.artist = 'BBC'
+
 @fooc.newfix
-def fix(self, f, printout=True):
+def fooc_fix(self, f, printout=True):
     self.defaultfix(f, printout)
     match = re.match(r"fooc_(\d{4})(\d{2})(\d{2})-\d+.*\.mp3", f.filename[-1])
     if match:

@@ -168,14 +168,12 @@ func NewSafeArrMap() safemap {
 	return thesafemap
 }
 
-func worker(in1 chan *RollArray, in2 chan *RollArray, 
+func worker(in1 chan *RollArray, in2 chan *RollArray,
 			mp safearrchmap, procchan chan *RollArray){
-	arr1 := <- in1
+	arr1 := <-in1
 	in1 <- arr1
-	
-	arr2 := <- in2
+	arr2 := <-in2
 	in2 <- arr2
-	
 	n := arr1.ndie + arr2.ndie
 	storechan, made := mp.Get(n)
 	var newarr *RollArray
@@ -184,7 +182,6 @@ func worker(in1 chan *RollArray, in2 chan *RollArray,
 	} else {
 		newarr = <-storechan
 	}
-	
 	procchan <- newarr
 }
 
@@ -192,7 +189,7 @@ func GetRolls(ndie uint, nsides uint){
 	l := list.New()
 	theBigMap.Get(1, nsides) // make sure the inner map is made,
 	                         // and that it has a 1 in it
-	
+
 	outermap := <-theBigMap
 	innermap, _ := (*outermap)[nsides]
 	fmt.Printf("%#v\n", innermap)
@@ -204,7 +201,7 @@ func GetRolls(ndie uint, nsides uint){
 	// make all the subchans
 	chanmap := newSafeArrMap()
 	processchan := make(chan *RollArray, 50)
-	
+
 	curn := ndie
 	for curval := getn(l, curn); curval != ndie; curval = getn(l, curn){
 		curn -= curval
@@ -217,7 +214,7 @@ func GetRolls(ndie uint, nsides uint){
 		curchan <- arr
 		processchan <- curchan
 	}
-	
+
 func processstarter(processchan chan *RollArray, mp safearrchmap) {
 	var lastpulled *RollArray = nil
 	for i := range processchan {

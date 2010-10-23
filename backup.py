@@ -10,44 +10,48 @@ now = datetime.today()
 
 
 #variables
-diskpath = path('/media/backup/rsynced')
+diskpath = path('/media/backup')
+diskfolder = diskpath + 'rsynced'
 foldername = '%Y%m%d-%H%M%S'
 numbackups=10
 
 rsyncdirs = ['/home','/bin','/boot','/data','/etc','/var','/usr',
              '/lib','/root']
 # minimal
-rsyncdirs = ['/home','/boot','/data']
+rsyncdirs = ['/home','/boot','/data', '/etc']
 rsyncopts = ['--archive', '--backup', 
              '--verbose', '--progress', '--itemize-changes',
              '--delete', # in case there's somehow already junk in that folder
                          # from a failed backup
              '--delete-excluded'
              ]
+excludes = ['/home/wendell/.gvfs']
+
 
 #code
 # mount
-if not diskpath.exists():
+if not diskfolder.exists():
     print('Mounting...')
-    backupdev=(
-        '/dev/disk/by-id/usb-WD_2500BMV_' + 
-        'External_57442D575845583038414638363538-0:0-part1')
-    mntargs = ['sudo','mount','-text4',backupdev, '/media/backup']
+    # backupdev=(
+    #     '/dev/disk/by-id/usb-WD_2500BMV_' + 
+    #     'External_57442D575845583038414638363538-0:0-part1')
+    # mntargs = ['sudo','mount','-text4',backupdev, '/media/backup']
+    mntargs = ['mount', str(diskpath)]
     mntproc = Popen(mntargs)
     mntproc.wait()
 
-if not diskpath.exists():
-    raise IOError("Backup directory {0} does not exist".format(diskpath))
+if not diskfolder.exists():
+    raise IOError("Backup directory {0} does not exist".format(diskfolder))
 
-destdir = diskpath + 'tmp'
+destdir = diskfolder + 'tmp'
 
-backedup = sorted([d for d in diskpath.getdirs() if d != destdir])
+backedup = sorted([d for d in diskfolder.getdirs() if d != destdir])
 if len(backedup) > 0:
     lastbackup = backedup[-1]
     rsyncopts.append(r'--link-dest={0}'.format(str(lastbackup)))
     print('Using hard links from',lastbackup)
 
-nowbackup = diskpath + now.strftime(foldername)
+nowbackup = diskfolder + now.strftime(foldername)
 # we backup to 'tmp', and then rename it when it completes. This means that
 # unfinished backups get written over and completed, and only complete
 # backups are given numbers. This is also especially useful for conserving disk 
@@ -56,9 +60,9 @@ if not destdir.exists():
     destdir.mkdir()
 # run rsync
 dirsasargs = [str(d) for d in rsyncdirs]
+excludeargs = ['--exclude=' + str(d) for d in excludes]
 
-
-opts = rsyncopts + dirsasargs + [str(destdir)]
+opts = rsyncopts + dirsasargs + excludeargs + [str(destdir)]
 cmd = ['sudo','rsync'] + opts
 try:
     process = Popen(cmd)

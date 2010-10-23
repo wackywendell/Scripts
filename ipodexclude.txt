@@ -1,7 +1,12 @@
 - gpodder
 - audiobook/*Tolkien*
+- audiobook/*Holmes*Sign*
+- audiobook/*Holmes*Scarlet*
+- audiobook/*Holmes*Hound*
+- audiobook/*Holmes*Last*
 - audiobook/Brisingr
 - */cover
 - podcast/PRI
+- podcast/Agatha*
 P Playlist
 P *.bmark

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"maps"
 	"container/list"
 	"flag"
 	"big"

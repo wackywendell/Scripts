@@ -13,8 +13,8 @@ optparser.add_option('-f','--force',dest='force', action='store_true',
         help='Copy and run 2to3 regardless of timestamp')
 (opts, args) = optparser.parse_args()
 
-base = path("~/urwid").expanduser()
-newbase = path("~/urwid3").expanduser()
+base = path("~/pkgs/urwid").expanduser()
+newbase = path("~/pkgs/urwid3").expanduser()
 
 def makedirs(p):
     tomake = []

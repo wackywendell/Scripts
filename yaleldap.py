@@ -1,5 +1,7 @@
 import ldap
 from string import digits, printable, whitespace
+from string import ascii_lowercase as letters
+from collections import defaultdict
 
 yalehost = "ldap://directory.yale.edu"
 yalebn = "o=yale.edu"
@@ -10,6 +12,7 @@ ldintbn = yalebn
 
 def getld(host=yalehost,bn=yalebn):
     "Gets the current ldap server object, creating one if necessary"
+    global ldinternal
     try:
         if ldinternal:
             return ldinternal
@@ -42,6 +45,9 @@ class query:
         
     def __or__(self, q):
         return orquery(q, self)
+
+    def run(self, ld=None):
+        return [person(p) for p in queryqueries(str(self),ld=ld)]
 
 class orquery(query, list):
     "Takes a list of queries and combines them with 'or'."
@@ -82,11 +88,6 @@ class andquery(query, list):
             s += str(q)
         s += ')'
         return s
-
-q1 = query(q='123')
-q2 = query(j='abc')
-qo = orquery(q1,q2)
-qa = andquery(q1,q2)
 
 nums=digits
 
@@ -150,16 +151,15 @@ class person:
         d=obj[1]
         self.name  = d.get('cn',[""])[0]
         self.alias = d.get('alias',[""])[0]
+        self.year  = d.get('class',[""])[0]
         self.given = d.get('givenName',[""])[0]
         self.sn    = d.get('sn',[""])[0]
         self.email = d.get('mail',[""])[0]
         self.hmail = d.get('emailHome',[""])[0]
-        self.year  = d.get('class',[""])[0]
-        self.addr  = d.get('street',[""])[0]
-        self.city  = d.get('l',[""])[0]
         self.org   = d.get('o',[""])[0]
         self.dept  = d.get('ou',[""])[0]
         self.netid = d.get('uid',[""])[0]
+        self.major = d.get('major',[""])[0]
         self.curric= d.get('curriculumShortName',[""])[0]
         self.data  = d
     
@@ -167,7 +167,7 @@ class person:
             fixedstring("Name",25),
             fixedstring("Class/Year",12),
             fixedstring("Net ID",8),
-            fixedstring("Affiliation",18),
+            fixedstring("Major",18),
             fixedstring("Curriculum", 10),
             fixedstring("Alias", 15)
             ])
@@ -177,7 +177,7 @@ class person:
             fixedstring(self.name,25),
             fixedstring(self.year,12),
             fixedstring(self.netid,8),
-            fixedstring(self.dept,18),
+            fixedstring(self.major,18),
             fixedstring(self.curric, 10),
             fixedstring(self.alias, 15)
             
@@ -194,10 +194,8 @@ class person:
                 return cmp(self.sn, y.sn)
             elif y.name != self.name:
                 return cmp(self.name, y.name)
-            else:
-                return cmp(self.data, y.data)
-        else:
-            return cmp(self.data, y)
+            return cmp(self.data, y.data)
+        return cmp(self.data, y)
     
     @classmethod
     def tableprint(cls, iter=[]):
@@ -231,3 +229,26 @@ class person:
             rep = repr(v)[1:-1][:40]
             newdict[k] = rep
         return newdict
+
+pgrads16 = andquery(major='Physics',Class='2016')
+
+import time
+def pgrads():
+    l=[]
+    for d in digits:
+        q=andquery(major='Physics',curriculumShortName='GS',uid=('*'+d))
+        l.extend(q.run())
+        print d, len(l)
+        if d != digits[-1]:
+            time.sleep(1)
+    return l
+
+def cgrads():
+    l=[]
+    for c in letters:
+        q=andquery(major='Chemistry',curriculumShortName='GS',uid=(c+'*'))
+        l.extend(q.run())
+        print c, len(l)
+        if c != letters[-1]:
+            time.sleep(.4)
+    return l

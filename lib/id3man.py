@@ -1,9 +1,7 @@
 import mutagen
 from mutagen.id3 import ID3, ID3NoHeaderError
-from mutagen.easyid3 import EasyID3
 from collections import Mapping
 from myspath import path
-import os
 
 class id3manager(Mapping):
     _transdict = {

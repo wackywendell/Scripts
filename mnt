@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+
+from fpath import Path, Dir
+import subprocess
+import re
+import optparse
+import sys
+
+opter = optparse.OptionParser()
+opter.add_option('-u', '--unmount', action='store_true')
+
+(opts, args) = opter.parse_args()
+
+umount = opts.unmount
+
+
+mntdir = Dir('/media')
+paths = list(mntdir.children())
+mountre = re.compile(r'''(.*?) on (.*?) type (\w*).*''')
+
+def getmounted():
+    proc = subprocess.Popen(['mount','-l'], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    out,err = proc.communicate()
+    return dict((Path(mnted), (dev,fstype)) for (dev, mnted, fstype) in mountre.findall(out))
+
+mounted = getmounted()
+
+alreadymounted = {}
+
+for p in mounted:
+    if p not in paths:
+        continue
+    dev, fs = mounted[p]
+    alreadymounted[p] = dev
+
+mounting = []
+
+for p in paths:
+    if p in mounted and not umount:
+        continue
+    elif p not in mounted and umount:
+        continue
+    args = ['mount', str(p)]
+    print p,
+    sys.stdout.flush()
+    if umount:
+        args = ['sudo','eject', str(p)]
+    proc = subprocess.Popen(args, stderr = subprocess.PIPE, stdout=subprocess.PIPE)
+    out, err = proc.communicate()
+    retval = proc.returncode
+    if retval == 0:
+        if not umount:
+            print 'Mounted'
+        else:
+            print 'Unmounted'
+        mounting.append(p)
+    elif umount:
+        print 'RETURNED:', retval
+        print out
+        print err
+    else:
+        print 'failed'
+
