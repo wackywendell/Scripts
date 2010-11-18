@@ -240,8 +240,8 @@ function ged() { command gedit "$@" 2>/dev/null & }
 function sged() { command sudo -b gedit "$@" 2>/dev/null ; }
 
 #edit in geany a separate process
-function gn() { command geany 2>/dev/null "$@" & }
-function sgn() { command sudo -b geany 2>/dev/null "$@" ; }
+function gn() { command geany 2>/dev/null 1>/dev/null "$@" & }
+function sgn() { command sudo -b geany 1>/dev/null 2>/dev/null "$@" ; }
 
 function kwrite() { command kwrite "$@" 2>/dev/null ; }
 function kw() { command kwrite "$@" 2>/dev/null & }
