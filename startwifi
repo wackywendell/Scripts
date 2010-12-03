@@ -1,0 +1,5 @@
+#!/bin/bash
+
+sudo ifconfig eth1 up
+sudo iwconfig eth1 essid Espresso
+sudo dhcpcd eth1

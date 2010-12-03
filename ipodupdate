@@ -18,7 +18,7 @@ fi
 
 /home/wendell/scripts/mygpo.py
 
-command="python /home/wendell/scripts/id3simple.py"
+command="python2 /home/wendell/scripts/id3simple.py"
 echo $command
 $command
 echo "------------------------------------------------"

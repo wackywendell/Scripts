@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# use sudoedit /etc/sudoers to get no password needed
+# %sudo ALL=NOPASSWD: /etc/acpi/sleep.sh, /sbin/shutdown
+#terminator &
+
+
+#gnome-screensaver-command -l
+#sudo /etc/acpi/sleep.sh
+
+notify-send --icon computer "Shutting Down" "The computer is shutting down now." &
+sleep 1
+qdbus --system org.freedesktop.Hal /org/freedesktop/Hal/devices/computer org.freedesktop.Hal.Device.SystemPowerManagement.Shutdown
+

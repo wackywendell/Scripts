@@ -4,4 +4,4 @@ if [ -f $f ]; then
     PYTHONSTARTUP=$f
 fi
 
-python $f $@
+python2 $f $@

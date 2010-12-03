@@ -319,3 +319,14 @@ function mdav() {
 	stty echo
 	mkdir -p /media/dir
 }
+
+function tcumt() {
+    echo "Unmounting /media/crypt"
+    sudo truecrypt -t -d /home/wendell/Dropbox/crypt
+    }
+
+function tcmt() {
+	sudo mkdir -p /media/crypt
+	sudo truecrypt -t --protect-hidden=no -k "" --fs-options=users,uid=$(id -u),gid=$(id -g),fmask=0113,dmask=0002 --mount /home/wendell/Dropbox/crypt /media/crypt
+	sleep 20m && tcumt &
+}
