@@ -1,13 +1,20 @@
 #!/usr/bin/python
-
 # some stuff taken from http://eseth.org/filez/prefs/pythonrc.py
-import os, sys, atexit, pprint, re
+
+try:
+    import fancycompleter
+    _completer = fancycompleter.setup()
+    del fancycompleter
+except ImportError:
+    pass
+
+import os, sys
 
 _usereadline = True
 _usecolor = True
 _usespecials = True
-
 _savefile = '%s/.jpython/saves'  % os.environ["HOME"]
+
 if sys.version_info[0] > 2:
     _savefile += '3'
 if not os.path.exists(os.path.dirname(_savefile)):
@@ -15,13 +22,13 @@ if not os.path.exists(os.path.dirname(_savefile)):
 
 if _usereadline:
     try:
-        import readline
+        import readline as _readline
     except ImportError:
         print("Module readline not available.")
     else:
-        import rlcompleter
-        readline.parse_and_bind("tab: complete")
-
+        import rlcompleter as _rlcompleter
+        _readline.parse_and_bind("tab: complete")
+        
 # Color Support
 ###############
 
@@ -67,11 +74,13 @@ class _TermColors(dict):
                 self.update(dict([(k, self._base % v)
                             for k,v in self.COLOR_TEMPLATES]))
             
-            for k,v in self.COLOR_TEMPLATES:
-                self['B' + k] = self[k] + self['Bold']
         else:
-            print("No colors, in terminal " + os.environ.get('TERM'))
+            if not nocolor:
+                print("No colors, in terminal " + os.environ.get('TERM'))
             self.update(dict([(k, self.NoColor) for k,v in self.COLOR_TEMPLATES]))
+        
+        for k,v in self.COLOR_TEMPLATES:
+                self['B' + k] = self[k] + self['Bold']
     
     def splitter(self, txt, regexobj):
         splits = iter(regexobj.split(txt))
@@ -84,7 +93,18 @@ class _TermColors(dict):
             yield (word, sep)
         return
     
-    def wrap(self, txt, width=80):
+    def terminal_size(self):
+        """Taken from stackoverflow"""
+        import fcntl, termios, struct
+        h, w, hp, wp = struct.unpack('HHHH',
+            fcntl.ioctl(0, termios.TIOCGWINSZ,
+            struct.pack('HHHH', 0, 0, 0, 0)))
+        return w, h
+    
+    def wrap(self, txt, width=None):
+        import re
+        if not width or width < 1:
+            width, _ = self.terminal_size()
         newtxt=[]
         nextline=""
         curlength=0
@@ -118,7 +138,15 @@ class _TermColors(dict):
         return '\n'.join(newtxt)
 
 if _usecolor:
-    _c = _TermColors()
+    # set up dicts for colors
+    # _c uses the more complex version 
+    # (unless 'fancycompleter' is installed)
+    # _d uses the simpler version
+    if 'fancycompleter' in sys.modules:
+        _c = _TermColors(True)
+    else:
+        _c = _TermColors()
+    
     _d = _TermColors(True)
 else:
     _c = _TermColors(nocolor = True)
@@ -132,15 +160,17 @@ if _usereadline:
 
     # Read the existing history if there is one
     if os.path.exists(_histfile):
-        readline.read_history_file(_histfile)
+        _readline.read_history_file(_histfile)
 
     # Set maximum number of items that will be written to the history file
-    readline.set_history_length(300)
+    _readline.set_history_length(300)
 
     def _savehist():
-        readline.write_history_file(_histfile)
-
+        _readline.write_history_file(_histfile)
+    
+    import atexit
     atexit.register(_savehist)
+    del atexit
 
 # Enable Color Prompts
 ######################
@@ -167,6 +197,7 @@ if _usecolor:
 _ = None
 def _my_displayhook(value):
     "prints values with colored line numbers"
+    import pprint
     global _, _lastlinenum
     if value is not None:
         _ = value
@@ -177,22 +208,23 @@ def _my_displayhook(value):
 if _usecolor:
     sys.displayhook = _my_displayhook
 
-import traceback
+import traceback as _traceback
 def _my_excepthook(tp, val, trace):
     "Prints exceptions in color"
     global _errtype, _err, _trace
     (_errtype, _err, _trace) = (tp, val, trace)
     namestr = _c['BLightRed'] + tp.__name__ + _c['Normal']
-    sys.stderr.write(_c['BLightRed'] + '-'*80 + _c['Normal'] + '\n')
+    width, height = _c.terminal_size()
+    sys.stderr.write(_c['BLightRed'] + '-'*min(80, width) + _c['Normal'] + '\n')
     sys.stderr.write(namestr + ': ' + str(val) + '\n')
-    for (fname, lineno, funcname, txt) in traceback.extract_tb(trace):
+    for (fname, lineno, funcname, txt) in _traceback.extract_tb(trace):
         tstr = '  line ' + _c['BLightRed'] + str(lineno) + _c['Normal']
         tstr += ' in ' + _c['BLightBlue'] + funcname + _c['Normal'] + ', File \"'
         tstr += _c['BPurple'] + fname + _c['Normal'] + '\"\n'
         if txt:
             tstr += '    ' + _c['Bold'] + txt + _c['Normal'] + '\n'
         sys.stderr.write(tstr)
-    #traceback.print_tb(trace)
+    #_traceback.print_tb(trace)
 
 if _usecolor:
     sys.excepthook = _my_excepthook
@@ -208,358 +240,366 @@ if _usecolor:
 ##################################     
 # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/438813/
 
-import time
+import time as _time
 
-if _usespecials:
-    from code import InteractiveConsole as _InteractiveConsole
-    import imp
-    #EDITOR = os.environ.get('EDITOR', 'geany')
-    #EDIT_CMD = '\e'
+from code import InteractiveConsole as _InteractiveConsole
+import imp as _imp
+#EDITOR = os.environ.get('EDITOR', 'geany')
+#EDIT_CMD = '\e'
 
-    class _KeywordConsole(_InteractiveConsole):
-        """A console with color and special keywords.
+class _KeywordConsole(_InteractiveConsole):
+    """A console with color and special keywords.
 
 See _banner for keywords"""
-        def __init__(self, timeout = 30*24*60*60, *args, **kwargs):
-            if ['.'] not in sys.path and os.path.realpath('.') not in sys.path:
-                sys.path.append('.')
-            self.last_buffer = "" # This holds the last executed statement
-            self._ = None
-            self.shelf = None
-            self.tdict = None
-            self.lastmod = None
-            self.lastmodlocalize = False
-            self.timeout = timeout
-            atexit.register(self.cleanup)
-            _InteractiveConsole.__init__(self, *args, **kwargs)
-            self.locals['_console'] = self
-            self._modules = dict()
-            for f in sys.argv[1:]:
-                self.importfile(f, True)
-        
-        def runsource(self, source, *args, **kwargs):
-            "Takes source code, attempts to parse, prints exceptions"
-            self.last_buffer = source
-            return _InteractiveConsole.runsource(self, source, *args, **kwargs)
-        
-        def runcode(self, code):
-            "Runs code and saves output"
-            obj = _InteractiveConsole.runcode(self, code)
-            try:
-                if None != obj:
-                    self._ = _
-                return obj
-            except AttributeError:
-                self.showtraceback()
-        
-        def importfile(self, fname, localize=False):
-            """Import a file into self.locals.
-
-localize = False -> import file
-localize = True  -> import * from file"""
-            
-            #remove extension, if its there
-            if fname[-3:] == '.py':
-                fname = fname[:-3]
-            
-            def putindict(m, mname):
-                self.lastmod = m
-                self.lastmodlocalize = localize
-                if fname not in self._modules or not self._modules[fname]:
-                    self._modules[fname] = localize
-                if localize:
-                    #print(m.__dict__)
-                    self.locals.update(m.__dict__)
-                else:
-                    #print(m, mname)
-                    self.locals[mname] = m
-            
-            def writemod(mname, reloaded=False):
-                introword = 'Reloading ' if reloaded else 'Importing '
-                if localize: introword += "all from "
-                self.write(introword + _d['BPurple'] + mname + 
-                        _d['Normal'] + '\n')
-            
-            #try:
-                #m = __import__(fname)
-                #putindict(m, fname)
-                #writemod(fname)
-                #return
-            #except ImportError:
-                #pass
-            try:
-                mod = sys.modules[fname]
-                imp.reload(mod)
-                putindict(mod, fname)
-                writemod(fname, True)
-                return
-            except KeyError:
-                #print("KeyError")
-                pass
-            
-            try:
-                mname = os.path.basename(fname)
-                (file,path,descr) = imp.find_module(fname)
-            except Exception:
-                #print(1)
-                self.showtraceback()
-                return
-            #print (file,path,descr)
-            #if file:
-            try:
-                #self.write("Using jpython import...\n")
-                writemod(mname)
-                m=imp.load_module(mname,file,path,descr)
-                #print(m)
-                putindict(m, mname)
-            except Exception:
-                #print(2)
-                self.showtraceback()
-        
-        def colorize(self, name, obj=None):
-            if not obj:
-                obj = self.locals[name]
-            if isinstance(obj, type(imp)): # type(imp) is just <class 'module'>
-                return _d['BPurple'] + name + _d['Normal']
-            
-            #otherwise _objects are yellow, normal are white
-            elif name[:1] != '_':
-                return _d['BLightRed'] + name + _d['Normal']
-            else:
-                return name
-        
-        def write(self, val):
-            "What happens when you type 'print'"
-            #InteractiveConsole.write(self, 'WRITE CALLED, type' + str(type(val)))
-            _InteractiveConsole.write(self, val)
-        
-        def showtraceback(self):
-            "Call from within an 'except:' clause to print the exception"
-            global _errtype, _err, _trace
-            (_errtype, _err, _trace) = sys.exc_info()
-            namestr = _d['BLightRed'] + _errtype.__name__ + _d['Normal']
-            sys.stderr.write(_d['BLightRed'] + '-'*80 + _d['Normal'] + '\n')
-            sys.stderr.write(namestr + ': ' + str(_err) + '\n')
-            for (fname, lineno, funcname, txt) in traceback.extract_tb(_trace)[1:]:
-                tstr = '  line ' + _d['BLightRed'] + str(lineno) + _d['Normal'] +\
-                    ' in ' + _d['BLightBlue'] + funcname + _d['Normal'] +\
-                    ', File \"' + _d['BPurple'] + fname + _d['Normal'] + '\"\n'
-                if lineno == 1 and funcname == '<module>' and fname == '<console>':
-                    tstr += "    User input: " + _d['Bold'] + self.last_buffer +\
-                                _d['Normal'] + '\n'
-                elif txt:
-                    tstr += '    ' + _d['Bold'] + txt + _d['Normal'] + '\n'
-                sys.stderr.write((tstr)) # _c.wrap
-            #_InteractiveConsole.showtraceback(self)
-        
-        def showsyntaxerror(self, fname = ''):
-            "Defines how syntax errors should be printed"
-            namestr = _c['BLightRed'] + "SyntaxError" + _d['Normal']
-            global _errtype, _err, _trace
-            (_errtype, _err, _trace) = sys.exc_info()
-            if fname == '<console>':
-                namestr = _d['BLightRed'] + "SyntaxError" + _d['Normal'] +\
-                    ": " + str(_err) + '\n'
-                sys.stderr.write((namestr)) # _c.wrap
-            else:
-                self.showtraceback()
-        
-        def getshelf(self):
-            "Gets the current shelf, opening the file if necessary"
-            if not self.shelf == None:
-                return self.shelf
-            else:
-                import shelve
-                self.shelf = shelve.open(_savefile)
-                self.tdict = shelve.open(_savefile + 'times')
-                return self.shelf
-        
-        def saveobj(self, strng, prnt = True):
-            "Save an object to the shelf"
-            if not strng:
-                if prnt:
-                    self.write('Save requires string.\n')
-                return
-            if strng not in self.locals:
-                if prnt:
-                    self.write(strng + ' does not exist.\n')
-                return
-            obj = self.locals[strng]
-            if obj == None:
-                del self.getshelf()[strng]
-                del self.tdict[strng]
-                if prnt:
-                    self.write(strng + ' removed.\n')
-            else:
-                self.getshelf()[strng] = obj
-                self.tdict[strng] = time.time()
-                if prnt:
-                    self.write(strng + ' saved.\n')
-        
-        def getobj(self, strng, prnt = True):
-            "Reload an object from the shelf into self.locals"
-            import time # override anything else that might have taken that name
-            if strng in self.getshelf():
-                obj = self.getshelf()[strng]
-                self.locals[strng] = obj
-                self.tdict[strng] = time.time()
-                if prnt:
-                    self.write(strng + ', ' + str(type(obj)) + '\n')
-            elif prnt:
-                    self.write(strng + ' not in save file.\n')
-        
-        def reget(self):
-            self.getobj('_modules', False)
-            moddict = self.locals['_modules']
-            for (fname, localize) in moddict.items():
-                self.importfile(fname, localize)
-            self.getobj('_lastlocals',False)
-            self.locals.update(self.locals['_lastlocals'])
-            objstring = ', '.join(sorted(self.locals['_lastlocals'].keys()))
-            #objstring = _c.wrap(objstring)
-            print("Loading " + objstring)
-        
-        def listobj(self, hidden):
-            names = []
-            for (k,v) in sorted(self.locals.items()):
-                if hidden or k[:1] != '_':
-                    names.append(self.colorize(k,v))
-            s = (", ".join(names) + '\n')
-            s = _d.wrap(s)
-            self.write(s)
-        
-        def cleanup(self):
-            """Remove everything older than 'self.timeout' from the shelf, and
-            save everything to lastlocals"""
-            from pickle import PicklingError
-            import time #override anything else called time
-            shelf = self.getshelf()
-            for k in shelf:
-                if k == '_times':
-                    continue
-                elif k not in self.tdict:
-                    del self.shelf[k]
-                elif self.tdict[k] < time.time() - self.timeout:
-                    del self.shelf[k]
-                    del self.tdict[k]
-            self.locals['_'] = self._
-            lastlocals = dict()
-            for name,obj in self.locals.items():
-                if (name != '_' and name[:1] == '_') or not name:
-                    continue
-                
-                #print(name)
-                try:
-                    lastlocals[name] = obj
-                    shelf['_lastlocals'] = lastlocals
-                    #print name
-                except TypeError:
-                    del lastlocals[name]
-                except PicklingError:
-                    del lastlocals[name]
-            
-            shelf['_modules'] = self._modules
-            #print(list(self._modules.items()))
-            
-            self.tdict['_lastlocals'] = time.time()
-            shelf.sync()
-            self.tdict.sync()
-            self.clean = True
-            #self.write('Cleaned up save file.\n')
-        
-        def raw_input(self, prompt):
-            "Process the raw input from the editor, including keywords"
-            global _linenum, _lastlinenum 
-            lineprinted = False
-            if '%d' in prompt:
-                prompt = prompt % _linenum
-                lineprinted = True
-            
-            line = _InteractiveConsole.raw_input(self, prompt)
-            _lastlinenum  = _linenum
-            
-            if not line:
-                return line
-            try:
-                if line[:2] == '??':
-                    #line = """os.system('$BROWSER \"http://docs.python.org/%s/\" &' % sys.version[:3])"""
-                    #def go(str):
-                        #os.system('$BROWSER %s &')
-                    
-                    #rest = line[2:].strip()
-                    #if rest:
-                        #http://www.google.com/search?hl=en&q=%s&btnI=I%27m+Feeling+Lucky
-                    os.system('$BROWSER \"http://docs.python.org/%s/\" &'
-                                    % sys.version[:3])
-                    line = ""
-                elif line[:3] == 'cd ':
-                    p = os.path.expanduser(line[3:].strip())
-                    os.chdir(p)
-                    self.write(str(os.getcwd()) + '\n')
-                    line = ""
-                elif line[:4] == 'get ':
-                    oname = line[4:]
-                    line = ''
-                    self.getobj(oname)
-                elif line.strip() == 'reget':
-                    self.reget()
-                    line=''
-                elif line[:3] == 'sv ':
-                    oname, line = line[3:], ''
-                    self.saveobj(oname)
-                elif line[0] == '?':
-                    line = 'help(' + line[1:] + ')'
-                elif line[-1] == '?':
-                    line = 'help(' + line[:-1] + ')'
-                elif line[0] == ';':
-                    line = 'os.system("""' + line[1:] + '""")'
-                elif line[:2] == 'i ':
-                    self.importfile(line[2:])
-                    line = ''
-                elif line[:3] == 'ii ':
-                    self.importfile(line[3:],True)
-                    line = ''
-                elif line == 'rel':
-                    if self.lastmod:
-                        self.importfile(self.lastmod.__name__, self.lastmodlocalize)
-                    line = ''
-                elif line.strip() == '.':
-                    self.listobj(False)
-                    line=''
-                elif line.strip() == '..':
-                    self.listobj(True)
-                    line=''
-                if lineprinted:
-                        #print('\"\"\"%s\"\"\"' % line)
-                        _linenum += 1
-            except Exception:
-                self.showtraceback()
-            return line
-
-    _verstring = _d['BYellow'] + 'Fancy Python ' + \
-            sys.version.splitlines()[0] + _d['Normal']
-    #_banner = """\
-    _banner=_verstring + "\n"
-    #_banner += "*Pretty printing enabled.^\n"
-    _banner += "_               -> Variable that represents last output\n"
-    _banner += "?**EXPR^^ or **EXPR^^?  -> help(**EXPR^^)\n"
-    _banner += "??              -> online help\n"
-    _banner += ";**EXPR^^           -> shell call for **EXPR^^\n"
-    _banner += "i **NAME^^          -> import module **NAME^^\n"
-    _banner += "ii **NAME^^         -> import * from module **NAME^^\n"
-    _banner += "rel             -> reload last module\n"
-    _banner += "sv **NAME^^         -> save **NAME^^ to save file\n"
-    _banner += "get **NAME^^        -> load **NAME^^ from save file\n"
-    _banner += "reget           -> load all variables from previous session\n"
-    _banner += ". or ..         -> list all available objects\n"
-    _banner = _banner.replace('**', _d['Bold']).replace('^',_d['Normal'])
+    def __init__(self, timeout = 30*24*60*60, *args, **kwargs):
+        if ['.'] not in sys.path and os.path.realpath('.') not in sys.path:
+            sys.path.append('.')
+        self.last_buffer = "" # This holds the last executed statement
+        self._ = None
+        self.shelf = None
+        self.tdict = None
+        self.lastmod = None
+        self.lastmodlocalize = False
+        self.timeout = timeout
+        import atexit
+        atexit.register(self.cleanup)
+        _InteractiveConsole.__init__(self, *args, **kwargs)
+        self.locals['_console'] = self
+        self._modules = dict()
+        for f in sys.argv[1:]:
+            self.importfile(f, True)
     
+    def runsource(self, source, *args, **kwargs):
+        "Takes source code, attempts to parse, prints exceptions"
+        self.last_buffer = source
+        return _InteractiveConsole.runsource(self, source, *args, **kwargs)
+    
+    def runcode(self, code):
+        "Runs code and saves output"
+        obj = _InteractiveConsole.runcode(self, code)
+        try:
+            if None != obj:
+                self._ = _
+            return obj
+        except AttributeError:
+            self.showtraceback()
+    
+    def importfile(self, fname, localize=False):
+        """Import a file into self.locals.
+
+    localize = False -> import file
+    localize = True  -> import * from file"""
+        
+        #remove extension, if its there
+        if fname[-3:] == '.py':
+            fname = fname[:-3]
+        
+        def putindict(m, mname):
+            self.lastmod = m
+            self.lastmodlocalize = localize
+            if fname not in self._modules or not self._modules[fname]:
+                self._modules[fname] = localize
+            if localize:
+                #print(m.__dict__)
+                self.locals.update(m.__dict__)
+            else:
+                #print(m, mname)
+                self.locals[mname] = m
+        
+        def writemod(mname, reloaded=False):
+            introword = 'Reloading ' if reloaded else 'Importing '
+            if localize: introword += "all from "
+            self.write(introword + _d['BPurple'] + mname + 
+                    _d['Normal'] + '\n')
+        
+        #try:
+            #m = __import__(fname)
+            #putindict(m, fname)
+            #writemod(fname)
+            #return
+        #except ImportError:
+            #pass
+        try:
+            mod = sys.modules[fname]
+            _imp.reload(mod)
+            putindict(mod, fname)
+            writemod(fname, True)
+            return
+        except KeyError:
+            #print("KeyError")
+            pass
+        
+        try:
+            mname = os.path.basename(fname)
+            (file,path,descr) = _imp.find_module(fname)
+        except Exception:
+            #print(1)
+            self.showtraceback()
+            return
+        #print (file,path,descr)
+        #if file:
+        try:
+            #self.write("Using jpython import...\n")
+            writemod(mname)
+            m=_imp.load_module(mname,file,path,descr)
+            #print(m)
+            putindict(m, mname)
+        except Exception:
+            #print(2)
+            self.showtraceback()
+    
+    def colorize(self, name, obj=None):
+        if not obj:
+            obj = self.locals[name]
+        if isinstance(obj, type(_imp)): # type(imp) is just <class 'module'>
+            return _d['BPurple'] + name + _d['Normal']
+        
+        #otherwise _objects are yellow, normal are white
+        elif name[:1] != '_':
+            return _d['BLightRed'] + name + _d['Normal']
+        else:
+            return name
+    
+    def write(self, val):
+        "What happens when you type 'print'"
+        #InteractiveConsole.write(self, 'WRITE CALLED, type' + str(type(val)))
+        _InteractiveConsole.write(self, val)
+    
+    def showtraceback(self):
+        "Call from within an 'except:' clause to print the exception"
+        global _errtype, _err, _trace
+        (_errtype, _err, _trace) = sys.exc_info()
+        namestr = _d['BLightRed'] + _errtype.__name__ + _d['Normal']
+        
+        width, height = _c.terminal_size()
+        sys.stderr.write(_d['BLightRed'] + '-'*min(80, width) + 
+                                            _d['Normal'] + '\n')
+        sys.stderr.write(namestr + ': ' + str(_err) + '\n')
+        for (fname, lineno, funcname, txt) in \
+                            _traceback.extract_tb(_trace)[1:]:
+            tstr = ('  line ' + _d['BLightRed'] + str(lineno) +
+                    _d['Normal'] + ' in ' + _d['BLightBlue'] + funcname
+                    + _d['Normal'] + ', File \"' + _d['BPurple'] + fname
+                     + _d['Normal'] + '\"\n')
+            if (lineno == 1 and funcname == '<module>' and 
+                                fname == '<console>'):
+                tstr += ("    User input: " + _d['Bold'] + 
+                        self.last_buffer + _d['Normal'] + '\n')
+            elif txt:
+                tstr += '    ' + _d['Bold'] + txt + _d['Normal'] + '\n'
+            sys.stderr.write((tstr)) # _c.wrap
+        #_InteractiveConsole.showtraceback(self)
+    
+    def showsyntaxerror(self, fname = ''):
+        "Defines how syntax errors should be printed"
+        namestr = _c['BLightRed'] + "SyntaxError" + _d['Normal']
+        global _errtype, _err, _trace
+        (_errtype, _err, _trace) = sys.exc_info()
+        if fname == '<console>':
+            namestr = _d['BLightRed'] + "SyntaxError" + _d['Normal'] +\
+                ": " + str(_err) + '\n'
+            sys.stderr.write((namestr)) # _c.wrap
+        else:
+            self.showtraceback()
+    
+    def getshelf(self):
+        "Gets the current shelf, opening the file if necessary"
+        if not self.shelf == None:
+            return self.shelf
+        else:
+            import shelve
+            self.shelf = shelve.open(_savefile)
+            self.tdict = shelve.open(_savefile + 'times')
+            return self.shelf
+    
+    def saveobj(self, strng, prnt = True):
+        "Save an object to the shelf"
+        if not strng:
+            if prnt:
+                self.write('Save requires string.\n')
+            return
+        if strng not in self.locals:
+            if prnt:
+                self.write(strng + ' does not exist.\n')
+            return
+        obj = self.locals[strng]
+        if obj == None:
+            del self.getshelf()[strng]
+            del self.tdict[strng]
+            if prnt:
+                self.write(strng + ' removed.\n')
+        else:
+            self.getshelf()[strng] = obj
+            self.tdict[strng] = _time.time()
+            if prnt:
+                self.write(strng + ' saved.\n')
+    
+    def getobj(self, strng, prnt = True):
+        "Reload an object from the shelf into self.locals"
+        import time as _time # override anything else that might have taken that name
+        if strng in self.getshelf():
+            obj = self.getshelf()[strng]
+            self.locals[strng] = obj
+            self.tdict[strng] = _time.time()
+            if prnt:
+                self.write(strng + ', ' + str(type(obj)) + '\n')
+        elif prnt:
+                self.write(strng + ' not in save file.\n')
+    
+    def reget(self):
+        self.getobj('_modules', False)
+        moddict = self.locals['_modules']
+        for (fname, localize) in moddict.items():
+            self.importfile(fname, localize)
+        self.getobj('_lastlocals',False)
+        self.locals.update(self.locals['_lastlocals'])
+        objstring = ', '.join(sorted(self.locals['_lastlocals'].keys()))
+        #objstring = _c.wrap(objstring)
+        print("Loading " + objstring)
+    
+    def listobj(self, hidden):
+        names = []
+        for (k,v) in sorted(self.locals.items()):
+            if hidden or k[:1] != '_':
+                names.append(self.colorize(k,v))
+        s = (", ".join(names) + '\n')
+        s = _d.wrap(s)
+        self.write(s)
+    
+    def cleanup(self):
+        """Remove everything older than 'self.timeout' from the shelf, and
+        save everything to lastlocals"""
+        from pickle import PicklingError
+        import time as _time #override anything else called time
+        shelf = self.getshelf()
+        for k in shelf:
+            if k == '_times':
+                continue
+            elif k not in self.tdict:
+                del self.shelf[k]
+            elif self.tdict[k] < _time.time() - self.timeout:
+                del self.shelf[k]
+                del self.tdict[k]
+        self.locals['_'] = self._
+        lastlocals = dict()
+        for name,obj in self.locals.items():
+            if (name != '_' and name[:1] == '_') or not name:
+                continue
+            
+            #print(name)
+            try:
+                lastlocals[name] = obj
+                shelf['_lastlocals'] = lastlocals
+                #print name
+            except TypeError:
+                del lastlocals[name]
+            except PicklingError:
+                del lastlocals[name]
+        
+        shelf['_modules'] = self._modules
+        #print(list(self._modules.items()))
+        
+        self.tdict['_lastlocals'] = _time.time()
+        shelf.sync()
+        self.tdict.sync()
+        self.clean = True
+        #self.write('Cleaned up save file.\n')
+    
+    def raw_input(self, prompt):
+        "Process the raw input from the editor, including keywords"
+        global _linenum, _lastlinenum 
+        lineprinted = False
+        if '%d' in prompt:
+            prompt = prompt % _linenum
+            lineprinted = True
+        
+        line = _InteractiveConsole.raw_input(self, prompt)
+        _lastlinenum  = _linenum
+        
+        if not line:
+            return line
+        try:
+            if line[:2] == '??':
+                #line = """os.system('$BROWSER \"http://docs.python.org/%s/\" &' % sys.version[:3])"""
+                #def go(str):
+                    #os.system('$BROWSER %s &')
+                
+                #rest = line[2:].strip()
+                #if rest:
+                    #http://www.google.com/search?hl=en&q=%s&btnI=I%27m+Feeling+Lucky
+                os.system('$BROWSER \"http://docs.python.org/%s/\" &'
+                                % sys.version[:3])
+                line = ""
+            elif line[:3] == 'cd ':
+                p = os.path.expanduser(line[3:].strip())
+                os.chdir(p)
+                self.write(str(os.getcwd()) + '\n')
+                line = ""
+            elif line[:4] == 'get ':
+                oname = line[4:]
+                line = ''
+                self.getobj(oname)
+            elif line.strip() == 'reget':
+                self.reget()
+                line=''
+            elif line[:3] == 'sv ':
+                oname, line = line[3:], ''
+                self.saveobj(oname)
+            elif line[0] == '?':
+                line = 'help(' + line[1:] + ')'
+            elif line[-1] == '?':
+                line = 'help(' + line[:-1] + ')'
+            elif line[0] == ';':
+                line = 'os.system("""' + line[1:] + '""")'
+            elif line[:2] == 'i ':
+                self.importfile(line[2:])
+                line = ''
+            elif line[:3] == 'ii ':
+                self.importfile(line[3:],True)
+                line = ''
+            elif line == 'rel':
+                if self.lastmod:
+                    self.importfile(self.lastmod.__name__, self.lastmodlocalize)
+                line = ''
+            elif line.strip() == '.':
+                self.listobj(False)
+                line=''
+            elif line.strip() == '..':
+                self.listobj(True)
+                line=''
+            if lineprinted:
+                    #print('\"\"\"%s\"\"\"' % line)
+                    _linenum += 1
+        except Exception:
+            self.showtraceback()
+        return line
+
+_verstring = _d['BYellow'] + 'Fancy Python ' + \
+        sys.version.splitlines()[0] + _d['Normal']
+#_banner = """\
+_banner=_verstring + "\n"
+#_banner += "*Pretty printing enabled.^\n"
+_banner += "_               -> Variable that represents last output\n"
+_banner += "?**EXPR^^ or **EXPR^^?  -> help(**EXPR^^)\n"
+_banner += "??              -> online help\n"
+_banner += ";**EXPR^^           -> shell call for **EXPR^^\n"
+_banner += "i **NAME^^          -> import module **NAME^^\n"
+_banner += "ii **NAME^^         -> import * from module **NAME^^\n"
+_banner += "rel             -> reload last module\n"
+_banner += "sv **NAME^^         -> save **NAME^^ to save file\n"
+_banner += "get **NAME^^        -> load **NAME^^ from save file\n"
+_banner += "reget           -> load all variables from previous session\n"
+_banner += ". or ..         -> list all available objects\n"
+_banner = _banner.replace('**', _d['Bold']).replace('^',_d['Normal'])
+
+
+if __name__ == "__main__":
     # if importing on run, no banner
     if sys.argv[1:]:
         _banner = ""
     
-    _console = _KeywordConsole(locals=locals())
+    _console = _KeywordConsole(locals = locals())
     _console.interact(banner = _banner)
-
-# Exit the Python shell on exiting the InteractiveConsole
+    
+    # Exit the Python shell on exiting the InteractiveConsole
     sys.exit()

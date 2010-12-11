@@ -2,16 +2,15 @@ import math
 from fpath import *
 from itertools import takewhile
 
+pfile = File("~/scripts/pychall/primes.txt").norm()
+
 class Primes(object):
     plst = [2]
     pset = set([2])
     curp = 3
-    pfile = File("~/scripts/pychall/primes.txt").norm()
     
-    def __init__(self, usefile=True):
-        self.usefile = usefile
-        if usefile:
-            self.read()
+    def __init__(self, usefile=None):
+        self.usefile = File(usefile)
     
     def calcnext(self):
         primestotest = takewhile(lambda x: x <= math.sqrt(self.curp),
@@ -24,6 +23,12 @@ class Primes(object):
             self.pset.add(self.curp)
             self.curp += 2
             return self.curp - 2
+    
+    def __enter__(self):
+        self.read()
+        
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.write()
     
     def calcto(self, n):
         while self.curp <= n:
@@ -41,13 +46,14 @@ class Primes(object):
     
     def write(self):
         txt = '\n'.join((str(n) for n in self))
-        with  self.pfile.open('w') as f:
+        with  self.usefile.open('w') as f:
                 f.write(txt)
+                print("Wrote file.")
     
     def read(self):
-        if not self.pfile.exists():
+        if not self.usefile.exists():
             return
-        with self.pfile.open('r') as f:
+        with self.usefile.open('r') as f:
             txt = f.read()
         for l in txt.split('\n'):
             l = l.strip()
@@ -63,21 +69,26 @@ class Primes(object):
         return n in self.pset
     
     def __del__(self):
-        if self.usefile:
-            self.write()
+        try:
+            if self.usefile:
+                self.write()
+        except Exception as e:
+            print(e)
     
     def getlast(self):
         return self.plst[-1]
 
 if __name__ == "__main__":
     print("Loading primes...")
-    p = Primes()
-    print("Primes loaded.")
-    stp = 1000
-    for i in range(stp*(p.getlast() // stp), 200*1000+1, stp):
-        print(i)
-        p.calcto(i)
-        print("len:", len(p),"last:", p.getlast(), "current:", p.curp)
-    p.write()
-    print(len(p), p.getlast(), p.curp)
+    with Primes(pfile) as p:
+        print("Primes loaded.")
+        stp = 1000
+        for i in range(stp*(p.getlast() // stp), 20*1000+1, stp):
+            print(i)
+            if p.isprime(i+3):
+                print("Prime:", i)
+            print("len:", len(p),"last:", p.getlast(), "current:", p.curp)
+        #~ p.write()
+        print(len(p), p.getlast(), p.curp)
+    #~ del p
     exit()
