@@ -1,88 +1,82 @@
 #!/usr/bin/python
 # some stuff taken from http://eseth.org/filez/prefs/pythonrc.py
 
+import os, sys, time, atexit, pprint, inspect, pydoc
+import fcntl, termios, struct
 try:
-    import fancycompleter
-    _completer = fancycompleter.setup()
-    del fancycompleter
+    import pygments
+    pygmentsexists = True
 except ImportError:
+    pygmentsexists = False
     pass
 
-import os, sys
-
-_usereadline = True
-_usecolor = True
-_usespecials = True
-_savefile = '%s/.jpython/saves'  % os.environ["HOME"]
-
 if sys.version_info[0] > 2:
-    _savefile += '3'
-if not os.path.exists(os.path.dirname(_savefile)):
-    os.makedirs(os.path.dirname(_savefile))
-
-if _usereadline:
-    try:
-        import readline as _readline
-    except ImportError:
-        print("Module readline not available.")
-    else:
-        import rlcompleter as _rlcompleter
-        _readline.parse_and_bind("tab: complete")
+    basestring = str
         
 # Color Support
 ###############
 
-class _TermColors(dict):
+class Term(object):
     """Gives easy access to ANSI color codes. Attempts to fall back to no color
-    for certain TERM values. (Mostly stolen from IPython.)"""
+    for certain TERM values. (Mostly stolen from IPython.)
+    
+    Now extended to include a couple miscellaenous text and console
+    functions; it should probably be refactored and _d and _c made out
+    of the same object."""
 
-    COLOR_TEMPLATES = (
-        ("Black"       , "0;30"),
-        ("Red"         , "0;31"),
-        ("Green"       , "0;32"),
-        ("Brown"       , "0;33"),
-        ("Blue"        , "0;34"),
-        ("Purple"      , "0;35"),
-        ("Cyan"        , "0;36"),
-        ("LightGray"   , "0;37"),
-        ("DarkGray"    , "1;30"),
-        ("LightRed"    , "1;31"),
-        ("LightGreen"  , "1;32"),
-        ("Yellow"      , "1;33"),
-        ("LightBlue"   , "1;34"),
-        ("LightPurple" , "1;35"),
-        ("LightCyan"   , "1;36"),
-        ("White"       , "1;37"),
-        ("Bold"        , "1;1"),
-        ("Normal"      , "0"),
-    )
+    COLOR_TEMPLATES = {
+        "Black"       : "0;30",
+        "Red"         : "0;31",
+        "Green"       : "0;32",
+        "Brown"       : "0;33",
+        "Blue"        : "0;34",
+        "Purple"      : "0;35",
+        "Cyan"        : "0;36",
+        "LightGray"   : "0;37",
+        "DarkGray"    : "1;30",
+        "LightRed"    : "1;31",
+        "LightGreen"  : "1;32",
+        "Yellow"      : "1;33",
+        "LightBlue"   : "1;34",
+        "LightPurple" : "1;35",
+        "LightCyan"   : "1;36",
+        "White"       : "1;37",
+        "Bold"        : "1;1",
+        "Normal"      : "0",
+    }
 
     NoColor = ''
-    _base  = '\001\033[%sm\002'
-    #_base  = r'\[\e[%sm\]'
-    _simple = '\033[%sm'
-    #_simple  = r'\[\e[%sm\]'
+    Prompt  = '\001\033[%sm\002' # for use as sys.ps1; the '\001', '\002'
+                                # indicate characters that don't count
+    Simple = '\033[%sm'
 
-    def __init__(self, simple=False, nocolor = False):
-        if not nocolor and os.environ.get('TERM') in ('xterm', 'xterm-color',
-                'xterm-256color', 'linux', 'screen', 'screen-256color',
-                'screen-bce'):
-            if simple:
-                self.update(dict([(k, self._simple % v) 
-                            for k,v in self.COLOR_TEMPLATES]))
-            else:
-                self.update(dict([(k, self._base % v)
-                            for k,v in self.COLOR_TEMPLATES]))
-            
-        else:
-            if not nocolor:
-                print("No colors, in terminal " + os.environ.get('TERM'))
-            self.update(dict([(k, self.NoColor) for k,v in self.COLOR_TEMPLATES]))
+    def __init__(self):
+        templates = self.COLOR_TEMPLATES
+        if 'BYellow' not in templates:
+            for k,v in list(templates.items()):
+                    templates['B' + k] = (templates[k] + ';' +
+                                            templates['Bold'])
         
-        for k,v in self.COLOR_TEMPLATES:
-                self['B' + k] = self[k] + self['Bold']
+        self.default = self.Simple
+        
+    @property
+    def cancolor(self):
+        return os.environ.get('TERM') in ('xterm', 'xterm-color',
+                'xterm-256color', 'linux', 'screen', 'screen-256color',
+                'screen-bce')
+    
+    def getcol(self, colname, base = None):
+        if base is None:
+            base = self.default
+        if base == self.NoColor:
+            return ''
+        else:
+            return base % self.COLOR_TEMPLATES[colname]
     
     def splitter(self, txt, regexobj):
+        """Splits txt based on a regexp, then yields (text, sep) pairs.
+        
+        Last pair is (finaltext, '')."""
         splits = iter(regexobj.split(txt))
         for word in splits:
             sep = ''
@@ -93,24 +87,34 @@ class _TermColors(dict):
             yield (word, sep)
         return
     
-    def terminal_size(self):
+    @property
+    def size(self):
         """Taken from stackoverflow"""
-        import fcntl, termios, struct
         h, w, hp, wp = struct.unpack('HHHH',
             fcntl.ioctl(0, termios.TIOCGWINSZ,
             struct.pack('HHHH', 0, 0, 0, 0)))
         return w, h
     
+    @property
+    def width(self):
+        """Taken from stackoverflow"""
+        h, w, hp, wp = struct.unpack('HHHH',
+            fcntl.ioctl(0, termios.TIOCGWINSZ,
+            struct.pack('HHHH', 0, 0, 0, 0)))
+        return w
+    
     def wrap(self, txt, width=None):
         import re
         if not width or width < 1:
-            width, _ = self.terminal_size()
+            width = self.width
         newtxt=[]
         nextline=""
         curlength=0
         cursep=''
         curcol = ''
-        colorwords = (re.escape(v) for v in self.values() if v)
+        colorwords = [re.escape(self.getcol(v))
+                            for v in self.COLOR_TEMPLATES]
+        colorwords = [v for v in colorwords if v]
         #print(repr('([' + ",".join(colorwords) + '])'))
         colre = re.compile('(' + "|".join(colorwords) + '+)')
         spacere = re.compile(r'([ \t]+)')
@@ -136,147 +140,149 @@ class _TermColors(dict):
             nextline = ''
             curlength = 0
         return '\n'.join(newtxt)
+    
+    def colorize(self, slist, base = None):
+        """Takes a list of strings (displayed normally) or (col, string)
+        pairs, and turns colors into terminal codes and displays."""
+        lastcode = None
+        finallist = []
+        
+        for s in slist:
+            if isinstance(s, basestring):
+                col = 'Normal'
+            else:
+                col, s = s
+            code = self.getcol(col, base)
+            if lastcode != code:
+                finallist.append(code)
+                lastcode = code
+            finallist.append(s)
+        finallist.append(self.getcol('Normal', base))
+        
+        return "".join(finallist)
 
-if _usecolor:
-    # set up dicts for colors
-    # _c uses the more complex version 
-    # (unless 'fancycompleter' is installed)
-    # _d uses the simpler version
-    if 'fancycompleter' in sys.modules:
-        _c = _TermColors(True)
+def getterm(usecolor = True):
+    term = Term()
+    if not usecolor:
+        term.default = term.NoColor
+    return term
+
+# see http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/438813/
+
+import time, traceback, types
+from code import InteractiveConsole
+import imp
+if pygmentsexists:
+    if sys.version_info[0] > 2:
+        from pygments.lexers import Python3Lexer as PythonLexer
     else:
-        _c = _TermColors()
+        from pygments.lexers import PythonLexer
+    from pygments.formatters import TerminalFormatter, Terminal256Formatter
     
-    _d = _TermColors(True)
-else:
-    _c = _TermColors(nocolor = True)
-    _d = _TermColors(nocolor = True)
-
-# Enable a History
-##################
-
-if _usereadline:
-    _histfile="%s/.pyhistory" % os.environ["HOME"]
-
-    # Read the existing history if there is one
-    if os.path.exists(_histfile):
-        _readline.read_history_file(_histfile)
-
-    # Set maximum number of items that will be written to the history file
-    _readline.set_history_length(300)
-
-    def _savehist():
-        _readline.write_history_file(_histfile)
     
-    import atexit
-    atexit.register(_savehist)
-    del atexit
-
-# Enable Color Prompts
-######################
-
-_linenum = 1
-_lastlinenum = 0
-
-if _usecolor:
-    sys.ps1 = '%s%%d%s> %s' % ( _c['BLightGreen'],
-                _c['Normal'] + _c['Green'], _c['Normal'])
-    sys.ps2 = '%s... %s' % (_c['Red'], _c['Normal'])
-                
-#def lineformat(d, col):
-    #return ('%s%%d%s: %s' % (d['Bold'] + d['Light' + col],
-                #d['Normal'] + d[col], d['Normal']))
-    _outps = ('%s%%d%s: %s' % (_d['BLightCyan'],
-                _d['Normal'] + _d['Cyan'], _d['Normal']))
-
-
-
-# Enable Pretty Printing for stdout
-###################################
-
-_ = None
-def _my_displayhook(value):
-    "prints values with colored line numbers"
-    import pprint
-    global _, _lastlinenum
-    if value is not None:
-        _ = value
-        outprompt = _outps % (_lastlinenum)
-        valuestr = (pprint.pformat(value)) # _c.wrap
-        sys.stderr.write(outprompt + valuestr + '\n')
-
-if _usecolor:
-    sys.displayhook = _my_displayhook
-
-import traceback as _traceback
-def _my_excepthook(tp, val, trace):
-    "Prints exceptions in color"
-    global _errtype, _err, _trace
-    (_errtype, _err, _trace) = (tp, val, trace)
-    namestr = _c['BLightRed'] + tp.__name__ + _c['Normal']
-    width, height = _c.terminal_size()
-    sys.stderr.write(_c['BLightRed'] + '-'*min(80, width) + _c['Normal'] + '\n')
-    sys.stderr.write(namestr + ': ' + str(val) + '\n')
-    for (fname, lineno, funcname, txt) in _traceback.extract_tb(trace):
-        tstr = '  line ' + _c['BLightRed'] + str(lineno) + _c['Normal']
-        tstr += ' in ' + _c['BLightBlue'] + funcname + _c['Normal'] + ', File \"'
-        tstr += _c['BPurple'] + fname + _c['Normal'] + '\"\n'
-        if txt:
-            tstr += '    ' + _c['Bold'] + txt + _c['Normal'] + '\n'
-        sys.stderr.write(tstr)
-    #_traceback.print_tb(trace)
-
-if _usecolor:
-    sys.excepthook = _my_excepthook
-
-# Exit message
-#################
-
-#atexit.register(lambda: sys.stdout.write("""%(DarkGray)s
-#Sheesh, I thought he'd never leave. Who invited that guy?
-#%(Normal)s""" % _c))
-
-# Start an external editor with \e
-##################################     
-# http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/438813/
-
-import time as _time
-
-from code import InteractiveConsole as _InteractiveConsole
-import imp as _imp
 #EDITOR = os.environ.get('EDITOR', 'geany')
 #EDIT_CMD = '\e'
 
-class _KeywordConsole(_InteractiveConsole):
+class KeywordConsole(InteractiveConsole):
     """A console with color and special keywords.
-
-See _banner for keywords"""
-    def __init__(self, timeout = 30*24*60*60, *args, **kwargs):
+    
+        This is the meat of jpython.
+        See _banner for keywords.
+        Lines are taken in by raw_input, preprocessed by various rules
+        (affecting keywords, etc.), and then processed by the internals
+        of InteractiveConsole. Most subfunctions are based on these
+        keywords, and called from raw_input
+        _KeywordConsole also has its own traceback function with colors;
+        see showtraceback."""
+    def __init__(self, term, savefile, aliases = None,
+                usecolorprompts = True,
+                timeout = 30*24*60*60,
+                *args, **kwargs):
         if ['.'] not in sys.path and os.path.realpath('.') not in sys.path:
             sys.path.append('.')
+        self.term = term
+        self.savefile = savefile
         self.last_buffer = "" # This holds the last executed statement
         self._ = None
         self.shelf = None
         self.tdict = None
         self.lastmod = None
         self.lastmodlocalize = False
+        self.aliases = aliases if aliases is not None else dict()
+        if pygmentsexists:
+            self.lexer = PythonLexer()
+            self.formatter = Terminal256Formatter(style='native')
         self.timeout = timeout
-        import atexit
         atexit.register(self.cleanup)
-        _InteractiveConsole.__init__(self, *args, **kwargs)
+        self.initprompts(usecolorprompts)
+        InteractiveConsole.__init__(self, *args, **kwargs)
         self.locals['_console'] = self
         self._modules = dict()
         for f in sys.argv[1:]:
             self.importfile(f, True)
+        
+    def initreadline(self):
+        """Loads readline, starts a standard rlcompleter, and sets the
+        namespace."""
+        import rlcompleter
+        self.completer = rlcompleter.Completer()
+        rlcompleter.readline.parse_and_bind("tab: complete")
+        rlcompleter.readline.set_completer(self.completer.complete)
+        self.completer.use_main_ns = False
+        self.completer.namespace = self.locals
+        
+    def inithist(self, histfile,readline=None):
+        if readline is None:
+            import readline
+
+        # Read the existing history if there is one
+        if os.path.exists(histfile):
+            readline.read_history_file(histfile)
+            
+        # Set maximum number of items that will be written to the history file
+        readline.set_history_length(300)
+
+        def savehist():
+            readline.write_history_file(histfile)
+
+        atexit.register(savehist)
+
+    
+    def initprompts(self, usecolor = True):
+        self._linenum = 1
+        self._lastlinenum = 0
+        term = self.term
+        
+        base = term.Prompt if term.default == term.Simple else term.NoColor
+        # fancycompleter can't handle colorized prompts
+        if 'fancycompleter' in sys.modules and base == term.Prompt:
+            base = term.Simple
+        if not usecolor:
+            base = term.NoColor
+
+        sys.ps1 = self.term.colorize([
+            ('BLightGreen', '%d'), ('Green', '> ')], base)
+        sys.ps2 = self.term.colorize([('Red','... ')], base)
+        self.outps = self.term.colorize([
+            ('BLightCyan', '%d'), ('Cyan', ': ')])
+        sys.displayhook = self.displayhook
+        
+    
+    def displayhook(self, value):
+        "prints values with colored line numbers"
+        if value is not None:
+            outprompt = self.outps % (self._lastlinenum)
+            valuestr = (pprint.pformat(value)) # _c.wrap
+            sys.stderr.write(outprompt + valuestr + '\n')
     
     def runsource(self, source, *args, **kwargs):
         "Takes source code, attempts to parse, prints exceptions"
         self.last_buffer = source
-        return _InteractiveConsole.runsource(self, source, *args, **kwargs)
+        return InteractiveConsole.runsource(self, source, *args, **kwargs)
     
     def runcode(self, code):
         "Runs code and saves output"
-        obj = _InteractiveConsole.runcode(self, code)
+        obj = InteractiveConsole.runcode(self, code)
         try:
             if None != obj:
                 self._ = _
@@ -284,11 +290,11 @@ See _banner for keywords"""
         except AttributeError:
             self.showtraceback()
     
-    def importfile(self, fname, localize=False):
+    def importfile(self, fname, localize=False, printout=True):
         """Import a file into self.locals.
 
-    localize = False -> import file
-    localize = True  -> import * from file"""
+        localize = False -> import file
+        localize = True  -> import * from file"""
         
         #remove extension, if its there
         if fname[-3:] == '.py':
@@ -300,48 +306,35 @@ See _banner for keywords"""
             if fname not in self._modules or not self._modules[fname]:
                 self._modules[fname] = localize
             if localize:
-                #print(m.__dict__)
                 self.locals.update(m.__dict__)
             else:
                 #print(m, mname)
                 self.locals[mname] = m
         
         def writemod(mname, reloaded=False):
+            if not printout: return
             introword = 'Reloading ' if reloaded else 'Importing '
             if localize: introword += "all from "
-            self.write(introword + _d['BPurple'] + mname + 
-                    _d['Normal'] + '\n')
-        
-        #try:
-            #m = __import__(fname)
-            #putindict(m, fname)
-            #writemod(fname)
-            #return
-        #except ImportError:
-            #pass
+            self.write(self.term.colorize([introword, ('BPurple', mname),'\n']))
         try:
             mod = sys.modules[fname]
-            _imp.reload(mod)
+            imp.reload(mod)
             putindict(mod, fname)
             writemod(fname, True)
             return
         except KeyError:
-            #print("KeyError")
             pass
         
         try:
             mname = os.path.basename(fname)
-            (file,path,descr) = _imp.find_module(fname)
+            (file,path,descr) = imp.find_module(fname)
         except Exception:
-            #print(1)
             self.showtraceback()
             return
-        #print (file,path,descr)
-        #if file:
         try:
             #self.write("Using jpython import...\n")
             writemod(mname)
-            m=_imp.load_module(mname,file,path,descr)
+            m=imp.load_module(mname,file,path,descr)
             #print(m)
             putindict(m, mname)
         except Exception:
@@ -349,58 +342,96 @@ See _banner for keywords"""
             self.showtraceback()
     
     def colorize(self, name, obj=None):
+        """Colorize 'name' as if it is obj, or find obj in locals if
+        not given."""
         if not obj:
             obj = self.locals[name]
-        if isinstance(obj, type(_imp)): # type(imp) is just <class 'module'>
-            return _d['BPurple'] + name + _d['Normal']
+        if isinstance(obj, types.ModuleType):
+            return self.term.colorize([('BPurple', name)])
         
-        #otherwise _objects are yellow, normal are white
+        #otherwise _objects are white, normal are white
         elif name[:1] != '_':
-            return _d['BLightRed'] + name + _d['Normal']
+            return self.term.colorize([('BLightRed', name)])
         else:
-            return name
+            return self.term.colorize([('BYellow', name)])
     
     def write(self, val):
         "What happens when you type 'print'"
-        #InteractiveConsole.write(self, 'WRITE CALLED, type' + str(type(val)))
-        _InteractiveConsole.write(self, val)
+        InteractiveConsole.write(self, val)
     
     def showtraceback(self):
         "Call from within an 'except:' clause to print the exception"
-        global _errtype, _err, _trace
-        (_errtype, _err, _trace) = sys.exc_info()
-        namestr = _d['BLightRed'] + _errtype.__name__ + _d['Normal']
+        global errtype, err, trace
+        (errtype, err, trace) = sys.exc_info()
+        colorize = self.term.colorize
         
-        width, height = _c.terminal_size()
-        sys.stderr.write(_d['BLightRed'] + '-'*min(80, width) + 
-                                            _d['Normal'] + '\n')
-        sys.stderr.write(namestr + ': ' + str(_err) + '\n')
+        namestr = colorize([('BLightRed', errtype.__name__)])
+        
+        width = self.term.width
+        sys.stderr.write(self.term.colorize([
+            ('BLightRed', '-'*min(80, width)), '\n']))
+        sys.stderr.write(namestr + ': ' + str(err) + '\n')
         for (fname, lineno, funcname, txt) in \
-                            _traceback.extract_tb(_trace)[1:]:
-            tstr = ('  line ' + _d['BLightRed'] + str(lineno) +
-                    _d['Normal'] + ' in ' + _d['BLightBlue'] + funcname
-                    + _d['Normal'] + ', File \"' + _d['BPurple'] + fname
-                     + _d['Normal'] + '\"\n')
+                            traceback.extract_tb(trace)[1:]:
+            tstr = colorize(['  line ', ('BLightRed', str(lineno)),
+            ' in ', ('BLightBlue',funcname), ', File \"',
+             ('BPurple', fname), '\"\n'])
             if (lineno == 1 and funcname == '<module>' and 
                                 fname == '<console>'):
-                tstr += ("    User input: " + _d['Bold'] + 
-                        self.last_buffer + _d['Normal'] + '\n')
+                tstr += colorize(["    User input: ",
+                ('Bold', self.last_buffer), '\n'])
             elif txt:
-                tstr += '    ' + _d['Bold'] + txt + _d['Normal'] + '\n'
+                tstr += colorize(['    ', ('Bold', txt), '\n'])
             sys.stderr.write((tstr)) # _c.wrap
-        #_InteractiveConsole.showtraceback(self)
-    
+            
     def showsyntaxerror(self, fname = ''):
         "Defines how syntax errors should be printed"
-        namestr = _c['BLightRed'] + "SyntaxError" + _d['Normal']
-        global _errtype, _err, _trace
-        (_errtype, _err, _trace) = sys.exc_info()
+        colorize = self.term.colorize
+        namestr = colorize([('BLightRed', "SyntaxError")])
+        global errtype, err, trace
+        (errtype, err, trace) = sys.exc_info()
         if fname == '<console>':
-            namestr = _d['BLightRed'] + "SyntaxError" + _d['Normal'] +\
-                ": " + str(_err) + '\n'
+            namestr = colorize([('BLightRed', "SyntaxError"), ": ",
+             str(err), '\n'])
             sys.stderr.write((namestr)) # _c.wrap
         else:
             self.showtraceback()
+    
+    def syntaxcolor(self, txt):
+        if not self.term.cancolor or not pygmentsexists:
+            return txt
+        else:
+            return pygments.highlight(txt, self.lexer, self.formatter)
+    
+    def getlocal(self, name):
+        names = name.split('.')
+        name = names[0]
+        if name not in self.locals:
+            self.write(self.term.colorize(['Object ', ('BLightRed', name),
+                        ' not found.\n']))
+            return
+        obj = self.locals[name]
+        for nextname in names[1:]:
+            name = name + '.' + nextname
+            try:
+                obj = getattr(obj, nextname)
+            except AttributeError:
+                self.write(self.term.colorize(['Object ', ('BLightRed', name),
+                        ' not found.\n']))
+                return
+        return obj
+    
+    def showsource(self, name):
+        obj = self.getlocal(name)
+        if obj is None:
+            return
+        try:
+            txt = inspect.getsource(obj)
+        except TypeError:
+            txt = "Source for " + str(obj) + " could not be found."
+        if self.term.default is not self.term.NoColor and self.term.cancolor:
+            txt = self.syntaxcolor(txt)
+        pydoc.pager(txt)
     
     def getshelf(self):
         "Gets the current shelf, opening the file if necessary"
@@ -408,12 +439,16 @@ See _banner for keywords"""
             return self.shelf
         else:
             import shelve
-            self.shelf = shelve.open(_savefile)
-            self.tdict = shelve.open(_savefile + 'times')
+            self.shelf = shelve.open(self.savefile)
+            self.tdict = shelve.open(self.savefile + 'times')
             return self.shelf
     
     def saveobj(self, strng, prnt = True):
-        "Save an object to the shelf"
+        """Save an object to the shelf.
+        
+        It would be cool if someday this handled modules by saving them
+        as specials, and then when 'loaded' the module would be 
+        imported."""
         if not strng:
             if prnt:
                 self.write('Save requires string.\n')
@@ -430,17 +465,16 @@ See _banner for keywords"""
                 self.write(strng + ' removed.\n')
         else:
             self.getshelf()[strng] = obj
-            self.tdict[strng] = _time.time()
+            self.tdict[strng] = time.time()
             if prnt:
                 self.write(strng + ' saved.\n')
     
     def getobj(self, strng, prnt = True):
         "Reload an object from the shelf into self.locals"
-        import time as _time # override anything else that might have taken that name
         if strng in self.getshelf():
             obj = self.getshelf()[strng]
             self.locals[strng] = obj
-            self.tdict[strng] = _time.time()
+            self.tdict[strng] = time.time()
             if prnt:
                 self.write(strng + ', ' + str(type(obj)) + '\n')
         elif prnt:
@@ -448,13 +482,12 @@ See _banner for keywords"""
     
     def reget(self):
         self.getobj('_modules', False)
-        moddict = self.locals['_modules']
+        moddict = self.locals.get('_modules', dict())
         for (fname, localize) in moddict.items():
             self.importfile(fname, localize)
         self.getobj('_lastlocals',False)
-        self.locals.update(self.locals['_lastlocals'])
+        self.locals.update(self.locals.get('_lastlocals', dict()))
         objstring = ', '.join(sorted(self.locals['_lastlocals'].keys()))
-        #objstring = _c.wrap(objstring)
         print("Loading " + objstring)
     
     def listobj(self, hidden):
@@ -463,7 +496,7 @@ See _banner for keywords"""
             if hidden or k[:1] != '_':
                 names.append(self.colorize(k,v))
         s = (", ".join(names) + '\n')
-        s = _d.wrap(s)
+        s = self.term.wrap(s)
         self.write(s)
     
     def cleanup(self):
@@ -503,30 +536,32 @@ See _banner for keywords"""
         shelf.sync()
         self.tdict.sync()
         self.clean = True
-        #self.write('Cleaned up save file.\n')
+        #~ self.write('Cleaned up save file.\n')
+    
+    def syscall(self, s):
+        prog, sep, tail = s.partition(' ')
+        prog = self.aliases.get(prog, prog)
+        return "os.system('''" + prog + sep + tail + "''')"
+    
+    def openeditor(self, name):
+        obj = self.getlocal(name)
+        editor = os.environ.get('EDITOR', 'vim')
+        pass
     
     def raw_input(self, prompt):
         "Process the raw input from the editor, including keywords"
-        global _linenum, _lastlinenum 
         lineprinted = False
         if '%d' in prompt:
-            prompt = prompt % _linenum
+            prompt = prompt % self._linenum
             lineprinted = True
         
-        line = _InteractiveConsole.raw_input(self, prompt)
-        _lastlinenum  = _linenum
+        line = InteractiveConsole.raw_input(self, prompt)
+        self._lastlinenum  = self._linenum
         
         if not line:
             return line
         try:
-            if line[:2] == '??':
-                #line = """os.system('$BROWSER \"http://docs.python.org/%s/\" &' % sys.version[:3])"""
-                #def go(str):
-                    #os.system('$BROWSER %s &')
-                
-                #rest = line[2:].strip()
-                #if rest:
-                    #http://www.google.com/search?hl=en&q=%s&btnI=I%27m+Feeling+Lucky
+            if line.strip() == '??':
                 os.system('$BROWSER \"http://docs.python.org/%s/\" &'
                                 % sys.version[:3])
                 line = ""
@@ -545,12 +580,18 @@ See _banner for keywords"""
             elif line[:3] == 'sv ':
                 oname, line = line[3:], ''
                 self.saveobj(oname)
+            elif line[:2] == '??':
+                self.showsource(line[2:].strip())
+                line=''
+            elif line[-2:] == '??':
+                self.showsource(line[:-2].strip())
+                line=''
             elif line[0] == '?':
                 line = 'help(' + line[1:] + ')'
             elif line[-1] == '?':
                 line = 'help(' + line[:-1] + ')'
             elif line[0] == ';':
-                line = 'os.system("""' + line[1:] + '""")'
+                line = self.syscall(line[1:])
             elif line[:2] == 'i ':
                 self.importfile(line[2:])
                 line = ''
@@ -569,37 +610,98 @@ See _banner for keywords"""
                 line=''
             if lineprinted:
                     #print('\"\"\"%s\"\"\"' % line)
-                    _linenum += 1
+                    self._linenum += 1
         except Exception:
             self.showtraceback()
         return line
 
-_verstring = _d['BYellow'] + 'Fancy Python ' + \
-        sys.version.splitlines()[0] + _d['Normal']
-#_banner = """\
-_banner=_verstring + "\n"
-#_banner += "*Pretty printing enabled.^\n"
-_banner += "_               -> Variable that represents last output\n"
-_banner += "?**EXPR^^ or **EXPR^^?  -> help(**EXPR^^)\n"
-_banner += "??              -> online help\n"
-_banner += ";**EXPR^^           -> shell call for **EXPR^^\n"
-_banner += "i **NAME^^          -> import module **NAME^^\n"
-_banner += "ii **NAME^^         -> import * from module **NAME^^\n"
-_banner += "rel             -> reload last module\n"
-_banner += "sv **NAME^^         -> save **NAME^^ to save file\n"
-_banner += "get **NAME^^        -> load **NAME^^ from save file\n"
-_banner += "reget           -> load all variables from previous session\n"
-_banner += ". or ..         -> list all available objects\n"
-_banner = _banner.replace('**', _d['Bold']).replace('^',_d['Normal'])
+def getbanner(term):
+    version = sys.version.splitlines()[0]
+    verstring = term.colorize([('BYellow', 'Fancy Python ' + version)])
+    banner = "_               -> Variable that represents last output\n"
+    banner += "?**EXPR^^ or **EXPR^^?  -> help(**EXPR^^)\n"
+    banner += "??              -> online help\n"
+    banner += "??**OBJ^^ or **OBJ^^??-> show source for **OBJ^^\n"
+    banner += ";**EXPR^^           -> shell call for **EXPR^^\n"
+    banner += "i **NAME^^          -> import module **NAME^^\n"
+    banner += "ii **NAME^^         -> import * from module **NAME^^\n"
+    banner += "rel             -> reload last module\n"
+    banner += "sv **NAME^^         -> save **NAME^^ to save file\n"
+    banner += "                   del **NAME^^ if **NAME^^ is None\n"
+    banner += "get **NAME^^        -> load **NAME^^ from save file\n"
+    banner += "reget           -> load all variables from last session\n"
+    banner += ". or ..         -> list all available objects\n"
+    banner = banner.replace('**', term.getcol('Bold')).replace('^^',
+                                    term.getcol('Normal'))
+    
+    return verstring + "\n" + banner
 
+
+def impconfig():
+    pth = '%s/.jpython/'  % os.environ["HOME"]
+    try:
+        mod, fp, desc = imp.find_module('config', [pth])
+    except ImportError:
+        return
+    m = imp.load_module('jpyconfig', mod, fp, desc)
+    return m
 
 if __name__ == "__main__":
-    # if importing on run, no banner
-    if sys.argv[1:]:
-        _banner = ""
+    # default config
+    usereadline = True
+    usecolor = True
+    usecolorprompt = True
+    savefile = '%s/.jpython/saves'  % os.environ["HOME"]
+    aliases = {'ls':'ls --color=auto'}
+    namespace = {}
+    importall = []
+    importlist = []
+    histfile="%s/.pyhistory" % os.environ["HOME"]
     
-    _console = _KeywordConsole(locals = locals())
-    _console.interact(banner = _banner)
+    # overwrite with real config
+    jpyconfig = impconfig()
+    if jpyconfig:
+        from jpyconfig import *
+    
+    term = getterm(usecolor)
+    if 'banner' not in locals() and not sys.argv[1:]:
+        banner = getbanner(term)
+    elif not sys.argv[1:]:
+        banner = ""
+    
+    # add a '3' for python3, so the shelf is not the same for python,
+    # python3
+    if sys.version_info[0] > 2:
+        savefile += str(sys.version_info[0])
+    if not os.path.exists(os.path.dirname(savefile)):
+        os.makedirs(os.path.dirname(savefile))
+
+
+    console = KeywordConsole(term= term, locals = namespace,
+                aliases = aliases,
+                savefile = savefile, usecolorprompts = usecolorprompt)
+    namespace = console.locals
+    namespace['_console'] = console
+
+    
+    if usereadline:
+        if 'completer' not in locals():
+            console.initreadline()
+            console.inithist(histfile)
+        else:
+            console.inithist(histfile, completer.config.readline)
+    
+    if 'completer' in locals():
+        namespace['_completer'] = completer
+        completer.namespace = namespace
+        completer.use_main_ns = False
+    
+    for mod in importall:
+        console.importfile(mod, True, False)
+    for mod in importlist:
+        console.importfile(mod, False, False)
+    
+    console.interact(banner = banner)
     
     # Exit the Python shell on exiting the InteractiveConsole
     sys.exit()

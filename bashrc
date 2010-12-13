@@ -43,7 +43,7 @@ export LD_LIBRARY_PATH='/home/wendell/lib'
 export BROWSER=firefox
 #export EDITOR=vim
 export EDITOR="gvim -f"
-export PAGER="less -r"
+export PAGER="less -R"
 # export COLORTERM=terminator # what is this?
 
 # for GO
