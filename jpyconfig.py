@@ -1,7 +1,9 @@
 # default config
+import os
+
 usereadline = True
 usecolor = True
-usecolorprompt = True
+usecolorprompts = True
 editor = os.environ.get('EDITOR', 'vim')
 savefile = '%s/.jpython/saves'  % os.environ["HOME"]
 aliases = {'ls':'ls --color=auto'}
