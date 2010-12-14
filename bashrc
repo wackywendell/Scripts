@@ -314,10 +314,10 @@ function urtest3() {
 }
 
 function mdav() {
-	stty -echo
-	read -p "Password for wws8:"; echo
-	stty echo
-	mkdir -p /media/dir
+    stty -echo
+    read -p "Password for wws8:"; echo
+    stty echo
+    mkdir -p /media/dir
 }
 
 function tcumt() {
@@ -326,7 +326,13 @@ function tcumt() {
     }
 
 function tcmt() {
-	sudo mkdir -p /media/crypt
-	sudo truecrypt -t --protect-hidden=no -k "" --fs-options=users,uid=$(id -u),gid=$(id -g),fmask=0113,dmask=0002 --mount /home/wendell/Dropbox/crypt /media/crypt
-	sleep 20m && tcumt &
+    sudo mkdir -p /media/crypt
+    sudo truecrypt -t --protect-hidden=no -k "" --fs-options=users,uid=$(id -u),gid=$(id -g),fmask=0113,dmask=0002 --mount /home/wendell/Dropbox/crypt /media/crypt
+    sleep 20m && tcumt &
+}
+
+alias fah=/etc/rc.d/foldingathome
+
+function fahstat() {
+    cat /opt/fah/folds/unitinfo.txt
 }

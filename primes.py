@@ -62,4 +62,4 @@ class PrimeGen(Iterable, Container):
     def __contains__(self, n):
         return self.isprime(n)
     
-p = PrimeGen()
+pgen = PrimeGen()
