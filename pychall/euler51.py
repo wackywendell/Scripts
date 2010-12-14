@@ -57,13 +57,6 @@ def allcombos(ndigits,fdigit=1):
     lastdig = [1,3,7,9]
     digits = [firstdig] + middigs + [lastdig]
     return itertools.product(*digits)
-    
-    #~ def joiner(arg):
-        #~ first, mid, last = arg
-        #~ return (first,) + mid + (last,)
-    #~ return map(joiner,
-        #~ itertools.product(firstdig, middigs, lastdig)
-        #~ )
 
 def findn(startdigs, fdigit=1, numps=8, nshow=2):
     found = []
@@ -105,5 +98,7 @@ for n in found:
 
 #~ p = Pattern("56**3")
 #~ print(p.numprimes(myps))
+
+del p
 
 #~ exit()
