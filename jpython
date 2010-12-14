@@ -194,27 +194,25 @@ class KeywordConsole(InteractiveConsole):
         keywords, and called from raw_input
         _KeywordConsole also has its own traceback function with colors;
         see showtraceback."""
-    def __init__(self, term, savefile, aliases = None,
-                usecolorprompts = True,
+    def __init__(self, term, config,
                 timeout = 30*24*60*60,
                 *args, **kwargs):
         if ['.'] not in sys.path and os.path.realpath('.') not in sys.path:
             sys.path.append('.')
         self.term = term
-        self.savefile = savefile
+        self.config = config
         self.last_buffer = "" # This holds the last executed statement
         self._ = None
         self.shelf = None
         self.tdict = None
         self.lastmod = None
         self.lastmodlocalize = False
-        self.aliases = aliases if aliases is not None else dict()
         if pygmentsexists:
             self.lexer = PythonLexer()
             self.formatter = Terminal256Formatter(style='native')
         self.timeout = timeout
         atexit.register(self.cleanup)
-        self.initprompts(usecolorprompts)
+        self.initprompts(config.usecolorprompts)
         InteractiveConsole.__init__(self, *args, **kwargs)
         self.locals['_console'] = self
         self._modules = dict()
@@ -428,9 +426,11 @@ class KeywordConsole(InteractiveConsole):
         try:
             txt = inspect.getsource(obj)
         except TypeError:
-            txt = "Source for " + str(obj) + " could not be found."
-        if self.term.default is not self.term.NoColor and self.term.cancolor:
-            txt = self.syntaxcolor(txt)
+            txt = self.term.colorize([("Bold","Source for " + 
+                                str(obj) + " could not be found.")])
+        else:
+            if self.term.default is not self.term.NoColor and self.term.cancolor:
+                txt = self.syntaxcolor(txt)
         pydoc.pager(txt)
     
     def getshelf(self):
@@ -439,8 +439,8 @@ class KeywordConsole(InteractiveConsole):
             return self.shelf
         else:
             import shelve
-            self.shelf = shelve.open(self.savefile)
-            self.tdict = shelve.open(self.savefile + 'times')
+            self.shelf = shelve.open(self.config.savefile)
+            self.tdict = shelve.open(self.config.savefile + 'times')
             return self.shelf
     
     def saveobj(self, strng, prnt = True):
@@ -540,13 +540,16 @@ class KeywordConsole(InteractiveConsole):
     
     def syscall(self, s):
         prog, sep, tail = s.partition(' ')
-        prog = self.aliases.get(prog, prog)
+        prog = self.config.aliases.get(prog, prog)
         return "os.system('''" + prog + sep + tail + "''')"
     
     def openeditor(self, name):
         obj = self.getlocal(name)
-        editor = os.environ.get('EDITOR', 'vim')
-        pass
+        fname = inspect.getsourcefile(obj)
+        lines, lineno = inspect.getsourcelines(obj)
+        editor = config.editor
+        return ('os.system("""' + editor + ' +' + str(lineno) + " '"
+                            + fname + '\'""")')
     
     def raw_input(self, prompt):
         "Process the raw input from the editor, including keywords"
@@ -590,6 +593,8 @@ class KeywordConsole(InteractiveConsole):
                 line = 'help(' + line[1:] + ')'
             elif line[-1] == '?':
                 line = 'help(' + line[:-1] + ')'
+            elif line[:3] == 'ed ':
+                line = self.openeditor(line[3:])
             elif line[0] == ';':
                 line = self.syscall(line[1:])
             elif line[:2] == 'i ':
@@ -621,7 +626,7 @@ def getbanner(term):
     banner = "_               -> Variable that represents last output\n"
     banner += "?**EXPR^^ or **EXPR^^?  -> help(**EXPR^^)\n"
     banner += "??              -> online help\n"
-    banner += "??**OBJ^^ or **OBJ^^??-> show source for **OBJ^^\n"
+    banner += "??**OBJ^^ or **OBJ^^??  -> show source for **OBJ^^\n"
     banner += ";**EXPR^^           -> shell call for **EXPR^^\n"
     banner += "i **NAME^^          -> import module **NAME^^\n"
     banner += "ii **NAME^^         -> import * from module **NAME^^\n"
@@ -638,32 +643,29 @@ def getbanner(term):
 
 
 def impconfig():
+    import jpyconfig # import defualts
     pth = '%s/.jpython/'  % os.environ["HOME"]
     try:
         mod, fp, desc = imp.find_module('config', [pth])
     except ImportError:
-        return
-    m = imp.load_module('jpyconfig', mod, fp, desc)
-    return m
+        return jpyconfig, {}
+    
+    m = imp.load_module('config', mod, fp, desc)
+    # m is the user's config file.
+    # it is pure python, and can edit jpyconfig freely; that is done
+    # 'behind the scenes' in this line.
+    # anything left in the module (without a __) is then put
+    # in the namespace for the console.
+    
+    namespace = dict([(k,v) for k,v in m.__dict__.items()
+                                    if len(k) > 1 and k[1] != '__'])
+    return jpyconfig, namespace
 
 if __name__ == "__main__":
-    # default config
-    usereadline = True
-    usecolor = True
-    usecolorprompt = True
-    savefile = '%s/.jpython/saves'  % os.environ["HOME"]
-    aliases = {'ls':'ls --color=auto'}
-    namespace = {}
-    importall = []
-    importlist = []
-    histfile="%s/.pyhistory" % os.environ["HOME"]
-    
     # overwrite with real config
-    jpyconfig = impconfig()
-    if jpyconfig:
-        from jpyconfig import *
+    config, namespace = impconfig() # import user settings
     
-    term = getterm(usecolor)
+    term = getterm(config.usecolor)
     if 'banner' not in locals() and not sys.argv[1:]:
         banner = getbanner(term)
     elif not sys.argv[1:]:
@@ -673,32 +675,32 @@ if __name__ == "__main__":
     # python3
     if sys.version_info[0] > 2:
         savefile += str(sys.version_info[0])
-    if not os.path.exists(os.path.dirname(savefile)):
-        os.makedirs(os.path.dirname(savefile))
-
+    if not os.path.exists(os.path.dirname(config.savefile)):
+        os.makedirs(os.path.dirname(config.savefile))
 
     console = KeywordConsole(term= term, locals = namespace,
-                aliases = aliases,
-                savefile = savefile, usecolorprompts = usecolorprompt)
+                config = config)
+                
+    # console creates a new dict for namespace, so we now refer to that 
+    # one so that it stays updated
     namespace = console.locals
     namespace['_console'] = console
 
-    
-    if usereadline:
+    if config.usereadline:
         if 'completer' not in locals():
             console.initreadline()
-            console.inithist(histfile)
+            console.inithist(config.histfile)
         else:
-            console.inithist(histfile, completer.config.readline)
+            console.inithist(config.histfile, completer.config.readline)
     
-    if 'completer' in locals():
-        namespace['_completer'] = completer
+    if 'completer' in dir(config):
+        namespace['_completer'] = completer = config.completer
         completer.namespace = namespace
         completer.use_main_ns = False
     
-    for mod in importall:
+    for mod in config.importall:
         console.importfile(mod, True, False)
-    for mod in importlist:
+    for mod in config.importlist:
         console.importfile(mod, False, False)
     
     console.interact(banner = banner)
