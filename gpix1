@@ -1,0 +1,13 @@
+#!/bin/zsh
+
+# Attempt 1
+# sed --in-place='.sedbk' 's/user_pref("layout.css.devPixelsPerPx", "[0-9.]*");/user_pref("layout.css.devPixelsPerPx", "1.0");/' ~/.mozilla/firefox/yc2isdec.default/prefs.js
+
+# Attempt 2
+echo 'user_pref("layout.css.devPixelsPerPx", "1.0");' > ~/.mozilla/firefox/yc2isdec.default/user.js
+
+#gsettings set org.gnome.desktop.interface text-scaling-factor 1.0
+
+# Attempt 3
+gsettings set org.gnome.desktop.interface scaling-factor 1
+gsettings set org.gnome.desktop.interface text-scaling-factor 1.0

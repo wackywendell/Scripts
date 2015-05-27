@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -o errexit -o nounset -o xtrace
+
+date '+%Y%m%d %H:%M'
+
+cd
+
+set +o errexit
+
+tarsnap -c -f "code-$(date '+%Y%m%d')" --exclude=rustlang --exclude=target --exclude='boost_*' --exclude=LocationHistory.json --exclude=gen --exclude=tmp'*' --exclude=build --check-links code
+CODERV=$?
+
+tarsnap -c -f "work-$(date '+%Y%m%d')" --exclude=target --exclude=gen --exclude=build --exclude=data --exclude=test --exclude=out --exclude=tmp'*' --check-links work
+WORKRV=$?
+
+set -o errexit
+
+if [[ $CODERV -ne 0 || $WORKRV -ne 0 ]] ; then
+    echo "At least one failed."
+    exit 1
+else
+    echo "Completed successfully, $(date '+%Y%m%d %H:%M')" >> ~/tsnap/successes.log
+fi
+

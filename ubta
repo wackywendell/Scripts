@@ -1,0 +1,13 @@
+#!/bin/zsh
+
+drs=("sorting-rs" "primes" "eulerrust" "rust" "parview")
+
+for dr in $drs; do
+    cd "$HOME/code/$dr"
+    cargo update && cargo build --release && cargo test
+    if [ "$?" -ne 0 ]; then
+        pwd
+        exit $?
+    fi
+done
+
